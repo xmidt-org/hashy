@@ -11,6 +11,7 @@ func main() {
 	app := fx.New(
 		provideConfig(),
 		provideLogger(),
+		provideServer(),
 	)
 
 	app.Run()
