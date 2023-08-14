@@ -3,7 +3,7 @@ module github.com/xmidt-org/hashy
 go 1.20
 
 require (
-	github.com/miekg/dns v1.1.54
+	github.com/miekg/dns v1.1.55
 	github.com/spf13/viper v1.16.0
 	go.uber.org/fx v1.20.0
 	go.uber.org/zap v1.25.0
