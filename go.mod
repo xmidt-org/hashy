@@ -6,7 +6,7 @@ require (
 	github.com/miekg/dns v1.1.56
 	github.com/spf13/viper v1.16.0
 	go.uber.org/fx v1.20.0
-	go.uber.org/zap v1.25.0
+	go.uber.org/zap v1.26.0
 )
 
 require (
