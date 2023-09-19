@@ -129,8 +129,6 @@ func (s *Server) serve() error {
 
 		go s.handle(semaphore, rw, request)
 	}
-
-	return ErrServerClosed
 }
 
 func (s *Server) handle(semaphore <-chan struct{}, rw ResponseWriter, request *Request) {
