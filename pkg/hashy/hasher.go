@@ -22,13 +22,15 @@ func NewHasher(vnodes int, values []string) (Hasher, error) {
 	return ch, nil
 }
 
-func NewDatacenterHashers(cfg Config) (m map[Datacenter]Hasher, err error) {
-	m = make(map[Datacenter]Hasher, len(cfg.Datacenters))
+type DatacenterHashers map[Datacenter]Hasher
+
+func NewDatacenterHashers(cfg Config) (dh DatacenterHashers, err error) {
+	dh = make(DatacenterHashers, len(cfg.Datacenters))
 	for dc, values := range cfg.Datacenters {
 		h, hErr := NewHasher(cfg.Vnodes, values)
 		err = multierr.Append(err, hErr)
 		if hErr == nil {
-			m[dc] = h
+			dh[dc] = h
 		}
 	}
 
