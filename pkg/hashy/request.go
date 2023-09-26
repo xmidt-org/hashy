@@ -6,8 +6,9 @@ import (
 )
 
 type Request struct {
-	RemoteAddr  net.Addr
-	DeviceNames DeviceNames
+	RemoteAddr net.Addr
+	Header     Header
+	Names      Stream[[]byte]
 
 	ctx context.Context
 }
@@ -18,11 +19,4 @@ func (r *Request) Context() context.Context {
 	}
 
 	return r.ctx
-}
-
-func NewRequest(names DeviceNames) *Request {
-	return &Request{
-		DeviceNames: names,
-		ctx:         context.Background(),
-	}
 }

@@ -9,15 +9,21 @@ type HandlerFunc func(ResponseWriter, *Request)
 func (hf HandlerFunc) ServeHash(rw ResponseWriter, r *Request) { hf(rw, r) }
 
 type DefaultHandler struct {
-	Hashers DatacenterHashers
+	Hashers *Hashers
 }
 
 func (dh *DefaultHandler) ServeHash(rw ResponseWriter, r *Request) {
-	for _, name := range r.DeviceNames {
-		for dc, hasher := range dh.Hashers {
-			// TODO: error handling
-			value, _ := hasher.Get(name.GetHashBytes())
-			rw.Add(name, dc, value)
+	for {
+		name, err := r.Names.Next()
+		if err != nil {
+			break
 		}
+
+		groups, values, err := dh.Hashers.HashName(name)
+		if err != nil {
+			break
+		}
+
+		rw.AddResult(name, groups, values)
 	}
 }

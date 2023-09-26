@@ -1,8 +1,9 @@
 package hashy
 
 import (
+	"errors"
+
 	"github.com/billhathaway/consistentHash"
-	"go.uber.org/multierr"
 )
 
 type Hasher interface {
@@ -22,16 +23,44 @@ func NewHasher(vnodes int, values []string) (Hasher, error) {
 	return ch, nil
 }
 
-type DatacenterHashers map[Datacenter]Hasher
+type Hashers struct {
+	groups  []string
+	hashers []Hasher
+}
 
-func NewDatacenterHashers(cfg Config) (dh DatacenterHashers, err error) {
-	dh = make(DatacenterHashers, len(cfg.Datacenters))
-	for dc, values := range cfg.Datacenters {
-		h, hErr := NewHasher(cfg.Vnodes, values)
-		err = multierr.Append(err, hErr)
-		if hErr == nil {
-			dh[dc] = h
+func NewHashers(cfg Config) (*Hashers, error) {
+	if len(cfg.Groups) == 0 {
+		return nil, errors.New("No groups defined")
+	}
+
+	h := &Hashers{
+		groups:  make([]string, 0, len(cfg.Groups)),
+		hashers: make([]Hasher, 0, len(cfg.Groups)),
+	}
+
+	for group, values := range cfg.Groups {
+		hasher, err := NewHasher(cfg.Vnodes, values)
+		if err != nil {
+			return nil, err
 		}
+
+		h.groups = append(h.groups, group)
+		h.hashers = append(h.hashers, hasher)
+	}
+
+	return h, nil
+}
+
+func (h Hashers) Len() int {
+	return len(h.groups)
+}
+
+func (h Hashers) HashName(name []byte) (groups, values []string, err error) {
+	groups = h.groups
+	values = make([]string, len(groups))
+
+	for i := 0; err == nil && i < len(groups); i++ {
+		values[i], err = h.hashers[i].Get(name)
 	}
 
 	return

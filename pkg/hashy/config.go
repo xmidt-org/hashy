@@ -6,6 +6,6 @@ type Config struct {
 	MaxPacketSize         int
 	MaxConcurrentRequests int
 
-	Datacenters map[Datacenter][]string
-	Vnodes      int
+	Groups map[string][]string
+	Vnodes int
 }

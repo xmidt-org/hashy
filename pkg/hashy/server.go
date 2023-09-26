@@ -37,7 +37,7 @@ type Server struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	conn   net.PacketConn
-	writer Writer
+	writer MessageWriter
 }
 
 func NewServer(cfg Config) (*Server, error) {
@@ -69,7 +69,7 @@ func (s *Server) listen() error {
 	}
 
 	s.conn = conn
-	s.writer = &syncWriter{
+	s.writer = &syncMessageWriter{
 		w: s.conn,
 	}
 
@@ -95,11 +95,7 @@ func (s *Server) newPacketBuffer() []byte {
 }
 
 func (s *Server) serve() error {
-	var (
-		semaphore = s.newSemaphore()
-		packet    = s.newPacketBuffer()
-	)
-
+	semaphore := s.newSemaphore()
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -109,35 +105,40 @@ func (s *Server) serve() error {
 			// continue
 		}
 
+		packet := s.newPacketBuffer()
 		n, remoteAddr, err := s.conn.ReadFrom(packet)
 		if err != nil {
+			s.Shutdown(context.Background())
 			return err
 		}
 
-		deviceNames, err := UnmarshalBytes[DeviceNames](packet[0:n])
-		if err != nil {
-			return err
-		}
-
-		request := NewRequest(deviceNames)
-		request.RemoteAddr = remoteAddr
-		request.ctx = s.ctx
-		rw := &responseWriter{
-			remoteAddr: remoteAddr,
-			writer:     s.writer,
-		}
-
-		go s.handle(semaphore, rw, request)
+		go s.handle(semaphore, remoteAddr, packet[:n])
 	}
 }
 
-func (s *Server) handle(semaphore <-chan struct{}, rw ResponseWriter, request *Request) {
+func (s *Server) handle(semaphore <-chan struct{}, remoteAddr net.Addr, message []byte) {
 	defer func() {
-		rw.Flush()
 		<-semaphore
 	}()
 
-	s.Handler.ServeHash(rw, request)
+	var stream Stream[[]byte]
+	header, payload, err := ReadHeaderBytes(message)
+	if err == nil {
+		stream, err = newStringStream(payload)
+	}
+
+	request := Request{
+		RemoteAddr: remoteAddr,
+		Header:     header,
+		Names:      stream,
+		ctx:        s.ctx,
+	}
+
+	rw := &responseWriter{
+		remoteAddr: remoteAddr,
+	}
+
+	s.Handler.ServeHash(rw, &request)
 }
 
 func (s *Server) ListenAndServe() error {
