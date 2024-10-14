@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/billhathaway/consistentHash v0.0.0-20140718022140-addea16d2229
-	go.uber.org/fx v1.22.2
+	go.uber.org/fx v1.23.0
 	go.uber.org/zap v1.27.0
 )
 
