@@ -4,6 +4,9 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/kong"
+	"github.com/xmidt-org/hashy/hashycfg"
+	"github.com/xmidt-org/hashy/hashysrv"
+	"github.com/xmidt-org/hashy/hashyzap"
 	"go.uber.org/fx"
 )
 
@@ -46,11 +49,9 @@ func run(args []string, opts ...kong.Option) {
 	app := fx.New(
 		fx.Supply(cli),
 		fx.Supply(ctx),
-		provideViper(),
-		provideConfig(),
-		provideLogging(),
-		provideHandler(),
-		provideServers(),
+		hashycfg.Provide(),
+		hashyzap.Provide(),
+		hashysrv.Provide(),
 	)
 
 	app.Run()
