@@ -54,3 +54,15 @@ func (mm *MsgMarshaler) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 func MsgField(key string, val *dns.Msg) zap.Field {
 	return zap.Object(key, (*MsgMarshaler)(val))
 }
+
+type ServerMarshaler dns.Server
+
+func (sm *ServerMarshaler) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("address", sm.Addr)
+	enc.AddString("network", sm.Net)
+	return nil
+}
+
+func ServerField(key string, val *dns.Server) zap.Field {
+	return zap.Object(key, (*ServerMarshaler)(val))
+}

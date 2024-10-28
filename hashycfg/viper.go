@@ -28,6 +28,7 @@ func NewViper() (v *viper.Viper, err error) {
 }
 
 // Unmarshal extracts a hashy configuration from the viper environment.
+// This function also applies certain defaults to the configuration.
 func Unmarshal(v *viper.Viper) (cfg Config, err error) {
 	err = v.UnmarshalExact(&cfg)
 	return

@@ -6,6 +6,16 @@ import (
 	"github.com/miekg/dns"
 )
 
+const (
+	// DefaultServerAddress is the address used by a Server when the Address
+	// field is unset.
+	DefaultServerAddress = ":53"
+
+	// DefaultServerAddress is the network used by a Server when the
+	// Network field is unset.
+	DefaultServerNetwork = "udp"
+)
+
 // Server represents a single server's configuration within
 // the hashy process.
 type Server struct {
@@ -22,46 +32,61 @@ type Server struct {
 	ReuseAddress  bool `json:"reuseAddress" yaml:"reuseAddress" mapstructure:"reuseAddress"`
 }
 
-// serverNetwork returns v if it is not empty, "dns" otherwise.
-func serverNetwork(v string) string {
-	if len(v) > 0 {
-		return v
+func (s Server) address() string {
+	if len(s.Address) > 0 {
+		return s.Address
 	}
 
-	return "udp"
+	return DefaultServerAddress
 }
 
-func serverIdleTimeout(v time.Duration) (f func() time.Duration) {
-	if v > 0 {
-		f = func() time.Duration {
-			return v
-		}
+func (s Server) network() string {
+	if len(s.Network) > 0 {
+		return s.Network
 	}
 
-	return
+	return DefaultServerNetwork
 }
 
+// NewServer creates a dns.Server from this configuration.
 func (s Server) NewServer() *dns.Server {
-	return &dns.Server{
-		Addr:          s.Address,
-		Net:           serverNetwork(s.Network),
+	server := &dns.Server{
+		Addr:          s.address(),
+		Net:           s.network(),
 		ReadTimeout:   s.ReadTimeout,
 		WriteTimeout:  s.WriteTimeout,
-		IdleTimeout:   serverIdleTimeout(s.IdleTimeout),
 		UDPSize:       s.UDPSize,
 		MaxTCPQueries: s.MaxTCPQueries,
 		ReusePort:     s.ReusePort,
 		ReuseAddr:     s.ReuseAddress,
 	}
+
+	if s.IdleTimeout > 0 {
+		server.IdleTimeout = func() time.Duration {
+			return s.IdleTimeout
+		}
+	}
+
+	return server
 }
 
 // Servers is an aggregate of multiple server configurations.
 type Servers []Server
 
+// NewServers creates a slice of dns.Server instances corresponding to this
+// configuration.
 func (ss Servers) NewServers() (servers []*dns.Server) {
-	servers = make([]*dns.Server, 0, len(ss))
-	for _, s := range ss {
-		servers = append(servers, s.NewServer())
+	if len(ss) > 0 {
+		servers = make([]*dns.Server, 0, len(ss))
+		for _, s := range ss {
+			servers = append(servers, s.NewServer())
+		}
+	} else {
+		// by default, start a udp and a tcp server on the default UDP port
+		servers = []*dns.Server{
+			Server{}.NewServer(),
+			Server{Network: "tcp"}.NewServer(),
+		}
 	}
 
 	return
@@ -95,6 +120,12 @@ func (c Client) NewClient() *dns.Client {
 // up a hashy process.  This is the top-level configuration object that
 // is unmarshaled.
 type Config struct {
+	// Servers configures the set of dns.Server instances that get started.
+	// If this field is unset, (2) dns.Server instances get started:
+	// (1) a udp server on the DefaultDNSAddress, and (2) a tcp server on the DefaultDNSAddress.
 	Servers Servers `json:"servers" yaml:"servers" mapstructure:"servers"`
-	Client  Client  `json:"client" yaml:"client" mapstructure:"client"`
+
+	// Client configures the dns.Client used to relay DNS requests not
+	// handled by hashy.
+	Client Client `json:"client" yaml:"client" mapstructure:"client"`
 }

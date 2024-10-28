@@ -7,11 +7,11 @@ import (
 	"go.uber.org/zap"
 )
 
-type handler struct {
+type Handler struct {
 	logger *zap.Logger
 }
 
-func (h *handler) ServeDNS(rw dns.ResponseWriter, request *dns.Msg) {
+func (h *Handler) ServeDNS(rw dns.ResponseWriter, request *dns.Msg) {
 	h.logger.Info("request received", hashyzap.MsgField("request", request))
 
 	var response dns.Msg
@@ -20,8 +20,8 @@ func (h *handler) ServeDNS(rw dns.ResponseWriter, request *dns.Msg) {
 	rw.WriteMsg(&response)
 }
 
-func NewHandler(l *zap.Logger, _ hashycfg.Config) dns.Handler {
-	return &handler{
+func NewHandler(l *zap.Logger, _ hashycfg.Config) *Handler {
+	return &Handler{
 		logger: l,
 	}
 }
