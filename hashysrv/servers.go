@@ -49,11 +49,7 @@ func OnStopServer(in ServerIn, s *dns.Server) func(context.Context) error {
 func NewServers(in ServerIn) (servers []*dns.Server) {
 	servers = in.Config.Servers.NewServers()
 	for _, s := range servers {
-		// use the configured handler as a prototype
-		handler := new(Handler)
-		*handler = *in.Handler
-		handler.logger = handler.logger.With(hashyzap.ServerField("server", s))
-		s.Handler = handler
+		s.Handler = in.Handler.WithLogFields(hashyzap.ServerField("server", s))
 
 		in.Lifecycle.Append(
 			fx.Hook{

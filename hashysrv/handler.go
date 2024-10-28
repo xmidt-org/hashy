@@ -11,6 +11,13 @@ type Handler struct {
 	logger *zap.Logger
 }
 
+func (h *Handler) WithLogFields(f ...zap.Field) *Handler {
+	with := new(Handler)
+	*with = *h
+	with.logger = with.logger.With(f...)
+	return with
+}
+
 func (h *Handler) ServeDNS(rw dns.ResponseWriter, request *dns.Msg) {
 	h.logger.Info("request received", hashyzap.MsgField("request", request))
 
