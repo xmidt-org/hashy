@@ -92,28 +92,21 @@ func (ss Servers) NewServers() (servers []*dns.Server) {
 	return
 }
 
-// Client represents the configuration for the DNS client
-// hashy uses to relay DNS requests.
-type Client struct {
-	Network string `json:"network" yaml:"network" mapstructure:"network"`
+// ZoneConfig holds any static RR records that hashy should know about.
+type ZoneConfig struct {
+	// Origin is the origin name for hashy.  This is used as the $ORIGIN
+	// when parsing master files.
+	Origin string `json:"origin" yaml:"origin" mapstructure:"origin"`
 
-	Timeout      time.Duration `json:"timeout" yaml:"timeout" mapstructure:"timeout"`
-	DialTimeout  time.Duration `json:"dialTimeout" yaml:"dialTimeout" mapstructure:"dialTimeout"`
-	ReadTimeout  time.Duration `json:"readTimeout" yaml:"readTimeout" mapstructure:"readTimeout"`
-	WriteTimeout time.Duration `json:"writeTimeout" yaml:"writeTimeout" mapstructure:"writeTimeout"`
+	// Files is a list of system paths that are RFC1035 master files.
+	// These files can contain an SOA record for hashy's domain as well
+	// as extra domain name information that hashy will use when responding
+	// to DNS requests.
+	Files []string `json:"files" yaml:"files" mapstructure:"files"`
 
-	UDPSize uint16 `json:"udpSize" yaml:"udpSize" mapstructure:"udpSize"`
-}
-
-func (c Client) NewClient() *dns.Client {
-	return &dns.Client{
-		Net:          c.Network,
-		Timeout:      c.Timeout,
-		DialTimeout:  c.DialTimeout,
-		ReadTimeout:  c.ReadTimeout,
-		WriteTimeout: c.WriteTimeout,
-		UDPSize:      c.UDPSize,
-	}
+	// Text is an embedded set of RR records.  This field allows a master
+	// file to be embedded within hashy's configuration file.
+	Text string `json:"text" yaml:"text" mapstructure:"text"`
 }
 
 // Config represents the configuration file or document that sets
@@ -122,10 +115,10 @@ func (c Client) NewClient() *dns.Client {
 type Config struct {
 	// Servers configures the set of dns.Server instances that get started.
 	// If this field is unset, (2) dns.Server instances get started:
-	// (1) a udp server on the DefaultDNSAddress, and (2) a tcp server on the DefaultDNSAddress.
+	// (1) a udp server on the DefaultServerAddress, and (2) a tcp server
+	// on the DefaultServerAddress.
 	Servers Servers `json:"servers" yaml:"servers" mapstructure:"servers"`
 
-	// Client configures the dns.Client used to relay DNS requests not
-	// handled by hashy.
-	Client Client `json:"client" yaml:"client" mapstructure:"client"`
+	// Zone holds information about the DNS zone that hashy serves.
+	Zone ZoneConfig `json:"zone" yaml:"zone" mapstructure:"zone"`
 }
