@@ -1,6 +1,7 @@
 package hashy
 
 import (
+	"bytes"
 	"strings"
 )
 
@@ -10,84 +11,85 @@ func normalizeName(v string) string {
 	return strings.ToLower(v)
 }
 
+// appendName adds a name to a Names set.  This function
+// returns true if the Names was updated.
+func appendName(n *Names, v string) bool {
+	v = normalizeName(v)
+	var exists bool
+	if _, exists = n.m[v]; !exists {
+		n.l += len(v)
+		n.m[v] = true
+	}
+
+	return !exists
+}
+
+// appendNames adds several names to a Names set.
+func appendNames(n *Names, list ...string) {
+	for _, v := range list {
+		appendName(n, v)
+	}
+}
+
 // Names is an immutable set of service names.  Names are deduped
 // and normalized. The zero value of this type is an empty set.
-// Use NewNames to create a non-empty Names. A nil Names is valid,
-// and is treated as empty by its methods.
+// Use NewNames to create a non-empty Names.
 type Names struct {
-	n map[string]bool
+	l int // the sum of the lengths of the names.  used as a hint for marshaling.
+	m map[string]bool
 }
 
 // NewNames constructs an immutable Names set.
-func NewNames(values ...string) *Names {
-	names := &Names{
-		n: make(map[string]bool, len(values)),
-	}
-
-	for _, v := range values {
-		names.n[normalizeName(v)] = true
-	}
-
-	return names
+func NewNames(list ...string) (names Names) {
+	names.m = make(map[string]bool, len(list))
+	appendNames(&names, list...)
+	return
 }
 
 // Len returns the count of service names in this set.
-// If this Names is nil, this method returns zero (0).
-func (n *Names) Len() int {
-	if n == nil {
-		return 0
-	}
-
-	return len(n.n)
+func (n Names) Len() int {
+	return len(n.m)
 }
 
 // Has tests if this set contains the normalized version of a given service name.
-// If this Names is nil, this method always returns false.
-func (n *Names) Has(v string) bool {
-	if n == nil {
-		return false
-	}
-
-	_, has := n.n[normalizeName(v)]
+func (n Names) Has(v string) bool {
+	_, has := n.m[normalizeName(v)]
 	return has
 }
 
 // All provides iteration over each name in this set.
-// If this Names is nil, this method does nothing.
-func (n *Names) All(f func(string) bool) {
-	if n != nil {
-		for name := range n.n {
-			if !f(name) {
-				return
-			}
+func (n Names) All(f func(string) bool) {
+	for name := range n.m {
+		if !f(name) {
+			return
 		}
 	}
 }
 
-// Merge returns a Names set that is the union of this Names
-// with the given list. If list is empty, this method returns
-// this Names as is. If this Names is nil or has zero length,
-// NewNames is used to create a new Names with the given list.
-func (n *Names) Merge(list ...string) *Names {
+// Merge produces a new Names instance that is the union of this Names and
+// the given list. The result is deduped and normalized.
+func (n Names) Merge(list ...string) (merged Names) {
 	switch {
-	case len(list) == 0:
-		return n
+	case n.Len() == 0:
+		merged = NewNames(list...)
 
-	case n == nil || n.Len() == 0:
-		return NewNames(list...)
+	case len(list) == 0:
+		merged = n
 
 	default:
-		merged := make(map[string]bool, n.Len()+len(list))
-		for name := range n.n {
-			merged[name] = true
+		merged = Names{
+			l: n.l,
+			m: make(map[string]bool, n.Len()+len(list)),
 		}
 
-		for _, name := range list {
-			merged[normalizeName(name)] = true
+		for existing := range n.m {
+			merged.m[existing] = true
 		}
 
-		return &Names{n: merged}
+		appendNames(&merged, list...)
 	}
+
+	return
 }
 
 // Update tests if a list of names would represent an update to
@@ -95,33 +97,78 @@ func (n *Names) Merge(list ...string) *Names {
 // accounting for duplicates, this method returns a distinct names
 // instance and true. Otherwise, this method returns this names
 // and false.
-//
-// Names are always immutable. This method does not modify the
-// original Names set.
-func (n *Names) Update(list ...string) (*Names, bool) {
+func (n Names) Update(list ...string) (Names, bool) {
 	switch {
 	case len(list) == 0:
 		return n, false // no update
 
-	case n == nil || n.Len() == 0:
+	case n.Len() == 0:
 		return NewNames(list...), true // the entire list is the update
 
 	default:
 		// have to account for any duplicates in the updated list
-		updated := make(map[string]bool, len(list))
-		sameNames := true
+		updated := Names{
+			m: make(map[string]bool, len(list)),
+		}
+
+		subset := true // whether the updated list is a subset of this Names
 		for _, name := range list {
-			name = normalizeName(name)
-			updated[name] = true
-			if sameNames {
-				_, sameNames = n.n[name]
+			if appendName(&updated, name) {
+				if subset {
+					_, subset = n.m[name]
+				}
 			}
 		}
 
-		if !sameNames || n.Len() != len(updated) {
-			return &Names{n: updated}, true
+		if !subset || n.Len() != updated.Len() {
+			return updated, true
 		}
 
 		return n, false
 	}
+}
+
+// MarshalJSON marshals this set of names as a JSON array.
+func (n *Names) MarshalJSON() ([]byte, error) {
+	if n == nil {
+		return []byte{'[', ']'}, nil
+	}
+
+	var b bytes.Buffer
+	b.Grow(
+		n.l + 3*len(n.m) + 1, // computes the space necessary for ["name1","name2",...]
+	)
+
+	b.WriteRune('[')
+	for name := range n.m {
+		if b.Len() > 1 {
+			b.WriteRune(',')
+		}
+
+		b.WriteRune('"')
+		b.WriteString(name)
+		b.WriteRune('"')
+	}
+
+	b.WriteRune(']')
+	return b.Bytes(), nil
+}
+
+// String returns a string representation of this names set.
+func (n *Names) String() string {
+	if n == nil {
+		return ""
+	}
+
+	var o strings.Builder
+	o.Grow(n.l + len(n.m) - 1) // computes the space necessary for name1,name2,...
+	for name := range n.m {
+		if o.Len() > 0 {
+			o.WriteRune(',')
+		}
+
+		o.WriteString(name)
+	}
+
+	return o.String()
 }

@@ -17,7 +17,7 @@ type Group string
 
 type locatorNode struct {
 	group Group
-	names *Names
+	names Names
 	ring  ring
 }
 
@@ -194,7 +194,7 @@ func (l *locator) initialize() {
 // newRing creates a hash ring using this locator's configuration
 // along with the given service names.  This method does not
 // require execution under the lock.
-func (l *locator) newRing(names *Names) ring {
+func (l *locator) newRing(names Names) ring {
 	return newRing(l.vnodes, l.hash.New64(), names)
 }
 
@@ -240,7 +240,7 @@ func (l *locator) Remove(g Group) {
 }
 
 func (l *locator) Update(g Group, list ...string) {
-	var updatedNames *Names
+	var updatedNames Names
 	needsUpdate := true
 
 	l.lock.RLock()

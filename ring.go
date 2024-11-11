@@ -26,7 +26,7 @@ func (r ring) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }
 
-func newRing(vnodes int, hash hash.Hash64, names *Names) (r ring) {
+func newRing(vnodes int, hash hash.Hash64, names Names) (r ring) {
 	var (
 		nameBuffer bytes.Buffer
 		prefix     = make([]byte, 0, 32) // grab enough that reallocations are unlikely
