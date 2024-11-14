@@ -15,10 +15,16 @@ const (
 // Service Locators can return services from multiple groups.
 type Group string
 
+// LocatedService is a tuple of group and service.
+type LocatedService struct {
+	Group   Group
+	Service Service
+}
+
 type locatorNode struct {
-	group Group
-	names Names
-	ring  ring
+	group    Group
+	services Services
+	ring     ring
 }
 
 type locatorNodes []locatorNode
@@ -58,14 +64,14 @@ func (ln locatorNodes) find(g Group) (*locatorNode, int) {
 
 // append adds more names to a group, or creates the group if it doesn't
 // exist. If the more slice is empty, this method does nothing.
-func (ln locatorNodes) append(g Group, more ...string) locatorNodes {
+func (ln locatorNodes) append(g Group, more ...Service) locatorNodes {
 	if len(more) > 0 {
 		if existing, _ := ln.find(g); existing != nil {
-			existing.names = existing.names.Merge(more...)
+			existing.services = existing.services.Merge(more...)
 		} else {
 			ln = append(ln, locatorNode{
-				group: g,
-				names: NewNames(more...),
+				group:    g,
+				services: NewServices(more...),
 			})
 
 			ln.sort()
@@ -100,15 +106,6 @@ func (ln locatorNodes) insert(newNode locatorNode) locatorNodes {
 	return ln
 }
 
-// Service is a located service.
-type Service struct {
-	// Group is any group associated with this service instance.
-	Group Group
-
-	// Name is the service name, which is normally a host name.
-	Name string
-}
-
 // LocatorOption represents a configurable option for a service Locator.
 type LocatorOption interface {
 	apply(*locator) error
@@ -137,9 +134,9 @@ func WithHash(hash Hash) LocatorOption {
 	})
 }
 
-// WithGroup initializes service names in a group for the locator. Multiple
+// WithGroup initializes services in a group for the locator. Multiple
 // uses of this option are cumulative.
-func WithGroup(g Group, more ...string) LocatorOption {
+func WithGroup(g Group, more ...Service) LocatorOption {
 	return locatorOptionFunc(func(l *locator) error {
 		l.nodes = l.nodes.append(g, more...)
 		return nil
@@ -149,12 +146,12 @@ func WithGroup(g Group, more ...string) LocatorOption {
 // Locator is a service locator.
 type Locator interface {
 	// Find locates services associated with the given value.
-	Find([]byte) []Service
+	Find([]byte) []LocatedService
 
 	// FindGroup locates services associated with the given value,
 	// but only within the specified group. If the given group does
 	// not exist, this method returns an empty slice.
-	FindGroup(Group, []byte) []Service
+	FindGroup(Group, []byte) []LocatedService
 
 	// Remove atomically removes a group and all its service names
 	// from this Locator.  If no such group exists, this method
@@ -163,7 +160,7 @@ type Locator interface {
 
 	// Update atomically updates the set of service names associated
 	// with the given group.
-	Update(Group, ...string)
+	Update(Group, ...Service)
 }
 
 // locator is the internal Locator implementation.
@@ -187,28 +184,28 @@ func (l *locator) initialize() {
 	}
 
 	for _, ln := range l.nodes {
-		ln.ring = l.newRing(ln.names)
+		ln.ring = l.newRing(ln.services)
 	}
 }
 
 // newRing creates a hash ring using this locator's configuration
 // along with the given service names.  This method does not
 // require execution under the lock.
-func (l *locator) newRing(names Names) ring {
-	return newRing(l.vnodes, l.hash.New64(), names)
+func (l *locator) newRing(services Services) ring {
+	return newRing(l.vnodes, l.hash.New64(), services)
 }
 
-func (l *locator) Find(v []byte) (services []Service) {
+func (l *locator) Find(v []byte) (services []LocatedService) {
 	l.lock.RLock()
 
 	if len(l.nodes) > 0 {
-		services = make([]Service, 0, len(l.nodes))
+		services = make([]LocatedService, 0, len(l.nodes))
 		target := l.hash.Sum64(v)
 
 		for _, ln := range l.nodes {
-			services = append(services, Service{
-				Group: ln.group,
-				Name:  ln.ring.get(target),
+			services = append(services, LocatedService{
+				Group:   ln.group,
+				Service: ln.ring.get(target),
 			})
 		}
 	}
@@ -217,14 +214,14 @@ func (l *locator) Find(v []byte) (services []Service) {
 	return
 }
 
-func (l *locator) FindGroup(g Group, v []byte) (services []Service) {
+func (l *locator) FindGroup(g Group, v []byte) (services []LocatedService) {
 	l.lock.RLock()
 
 	if node, _ := l.nodes.find(g); node != nil {
-		services = []Service{
-			Service{
-				Group: node.group,
-				Name:  node.ring.get(l.hash.Sum64(v)),
+		services = []LocatedService{
+			LocatedService{
+				Group:   node.group,
+				Service: node.ring.get(l.hash.Sum64(v)),
 			},
 		}
 	}
@@ -239,17 +236,17 @@ func (l *locator) Remove(g Group) {
 	l.lock.Unlock()
 }
 
-func (l *locator) Update(g Group, list ...string) {
-	var updatedNames Names
+func (l *locator) Update(g Group, list ...Service) {
+	var updatedServices Services
 	needsUpdate := true
 
 	l.lock.RLock()
 
 	existing, _ := l.nodes.find(g)
 	if existing != nil {
-		updatedNames, needsUpdate = existing.names.Update(list...)
+		updatedServices, needsUpdate = existing.services.Update(list...)
 	} else {
-		updatedNames = NewNames(list...)
+		updatedServices = NewServices(list...)
 		needsUpdate = true // this is a new group
 	}
 
@@ -258,9 +255,9 @@ func (l *locator) Update(g Group, list ...string) {
 	if needsUpdate {
 		// compute the new hash ring outside any lock
 		newNode := locatorNode{
-			group: g,
-			names: updatedNames,
-			ring:  l.newRing(updatedNames),
+			group:    g,
+			services: updatedServices,
+			ring:     l.newRing(updatedServices),
 		}
 
 		l.lock.Lock()
@@ -290,7 +287,7 @@ func NewLocator(opts ...LocatorOption) (Locator, error) {
 // Find uses the given locator to find services by a given string
 // value. No additional memory allocation is performed, making this
 // a better option that using []byte(value).
-func Find(l Locator, v string) []Service {
+func Find(l Locator, v string) []LocatedService {
 	return l.Find(
 		unsafe.Slice(unsafe.StringData(v), len(v)),
 	)
@@ -298,7 +295,7 @@ func Find(l Locator, v string) []Service {
 
 // FindGroup uses the given Locator to find a service only within
 // a certain group. No additional memory allocation is performed.
-func FindGroup(l Locator, g Group, v string) []Service {
+func FindGroup(l Locator, g Group, v string) []LocatedService {
 	return l.FindGroup(
 		g,
 		unsafe.Slice(unsafe.StringData(v), len(v)),

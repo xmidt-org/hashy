@@ -17,11 +17,11 @@ type Request struct {
 	// Group is the optional group name to restrict returned services.
 	Group string
 
-	// Qtype is the record type being requested.
-	Qtype uint16
-
 	// Origin is the domain that hashy recognized when it parsed this request.
 	Origin string
+
+	// Source is the DNS question that was parsed to produce this request.
+	Source dns.Question
 }
 
 // QuestionParser provides the logic to parse a DNS question into a request
@@ -34,18 +34,17 @@ type QuestionParser struct {
 // Parse examines a DNS question and produces a Request. If the question
 // is not supported, this method returns false.
 func (qp *QuestionParser) Parse(q dns.Question) (r Request, supported bool) {
+	r.Source = q
 	if q.Qclass != dns.ClassINET && q.Qclass != dns.ClassANY {
 		return
 	}
 
-	prefix, found := strings.CutSuffix(q.Name, qp.Origin)
-	if !found {
-		return
+	var prefix string
+	if prefix, supported = strings.CutSuffix(q.Name, qp.Origin); supported {
+		r.Origin = qp.Origin
+		r.ID, r.Group, _ = strings.Cut(prefix, ".")
+		r.ID, r.Nonce, _ = strings.Cut(r.ID, "-")
 	}
 
-	r.Qtype = q.Qtype
-	r.Origin = qp.Origin
-	r.ID, r.Group, _ = strings.Cut(prefix, ".")
-	r.ID, r.Nonce, _ = strings.Cut(r.ID, "-")
 	return
 }
