@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.23.1
 
 require (
-	github.com/alecthomas/kong v1.4.0
+	github.com/alecthomas/kong v1.5.1
 	github.com/miekg/dns v1.1.62
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/spf13/viper v1.19.0
