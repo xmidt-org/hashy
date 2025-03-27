@@ -6,7 +6,7 @@ require (
 	github.com/alecthomas/kong v1.9.0
 	github.com/miekg/dns v1.1.64
 	github.com/spaolacci/murmur3 v1.1.0
-	github.com/spf13/viper v1.20.0
+	github.com/spf13/viper v1.20.1
 	go.uber.org/fx v1.23.0
 	go.uber.org/zap v1.27.0
 )
