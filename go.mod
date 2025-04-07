@@ -1,9 +1,10 @@
 module github.com/xmidt-org/hashy
 
 go 1.23.0
+
 require (
 	github.com/alecthomas/kong v1.10.0
-	github.com/miekg/dns v1.1.64
+	github.com/miekg/dns v1.1.65
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/spf13/viper v1.20.1
 	go.uber.org/fx v1.23.0
