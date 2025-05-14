@@ -7,7 +7,7 @@ require (
 	github.com/miekg/dns v1.1.66
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/spf13/viper v1.20.1
-	go.uber.org/fx v1.23.0
+	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.27.0
 )
 
@@ -21,7 +21,7 @@ require (
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	go.uber.org/dig v1.18.0 // indirect
+	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
