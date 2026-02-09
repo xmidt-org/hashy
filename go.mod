@@ -3,7 +3,7 @@ module github.com/xmidt-org/hashy
 go 1.24.0
 
 require (
-	github.com/alecthomas/kong v1.13.0
+	github.com/alecthomas/kong v1.14.0
 	github.com/miekg/dns v1.1.72
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/spf13/viper v1.21.0
