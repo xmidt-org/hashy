@@ -1,6 +1,6 @@
 # hashy
 
-hashy enjoys performing hashes, particular in response to DNS queries.  But sadly, hashy doesn't have enough to do.  Won't you give hashy something to do?  No?  You monster!
+hashy is a distribute hashing-as-a-service server. It uses the results of hashing to direct traffic.
 
 [![Build Status](https://github.com/xmidt-org/hashy/workflows/CI/badge.svg)](https://github.com/xmidt-org/hashy/actions)
 [![codecov.io](http://codecov.io/github/xmidt-org/hashy/coverage.svg?branch=main)](http://codecov.io/github/xmidt-org/hashy?branch=main)
@@ -9,7 +9,6 @@ hashy enjoys performing hashes, particular in response to DNS queries.  But sadl
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=xmidt-org_PROJECT&metric=alert_status)](https://sonarcloud.io/dashboard?id=xmidt-org_PROJECT)
 [![GitHub release](https://img.shields.io/github/release/xmidt-org/hashy.svg)](CHANGELOG.md)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/xmidt-org/hashy)](https://pkg.go.dev/github.com/xmidt-org/hashy)
-
 
 ## Summary
 
