@@ -21,7 +21,7 @@ Hashy's DNS server understands hostnames with the following form:
 
 #### {deviceName}
 
-The `deviceName` is the string that is hashed. It can only contain characters that are valid for a hostname. The meaning of the `deviceName` is opaque to Hashy. It can be a MAC address, UUID, or any arbitrary identifier.
+The `deviceName` is the string that is hashed. It can only contain characters that are valid for a hostname. The meaning of the `deviceName` is opaque to Hashy. It can be a MAC address, UUID, or any arbitrary identifier. The list of servers returned via DNS is solely determined by the `deviceName`.
 
 #### {ignored text}
 
@@ -39,7 +39,9 @@ Hashy organizes servers into `groups`. A *group* is simply *a list of servers wi
 
 Hashy computes a hash of each group so that clients can determine if a group's members have changed.
 
-## CPE uses Hashy (instead of Petasos) to find a Talaria
+## Flows
+
+### CPE uses Hashy (instead of Petasos) to find a Talaria
 
 ```mermaid
 sequenceDiagram
@@ -54,7 +56,7 @@ sequenceDiagram
   CPE->>Talaria:connects
 ```
 
-## Talaria checks devices upon connection
+### Talaria checks devices upon connection
 
 ```mermaid
 sequenceDiagram
@@ -74,7 +76,7 @@ sequenceDiagram
   end
 ```
 
-## Talaria enforces device hashing
+### Talaria enforces device hashing
 
 ```mermaid
 sequenceDiagram
