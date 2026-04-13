@@ -43,6 +43,10 @@ Files: .dockerignore
 Copyright: SPDX-FileCopyrightText: 2025 Comcast Cable Communications Management, LLC
 License: Apache-2.0
 
-Files: cmd/hashy/hashy
+Files: **.md
+Copyright: SPDX-FileCopyrightText: 2025 Comcast Cable Communications Management, LLC
+License: Apache-2.0
+
+Files: openspec/config.yaml
 Copyright: SPDX-FileCopyrightText: 2025 Comcast Cable Communications Management, LLC
 License: Apache-2.0
