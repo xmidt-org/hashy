@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/miekg/dns"
+	"codeberg.org/miekg/dns"
 )
 
 // ServiceOption is a configurable option for a service.
