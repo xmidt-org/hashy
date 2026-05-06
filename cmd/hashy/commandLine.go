@@ -29,7 +29,7 @@ func (cl *CommandLine) newViper() (v *viper.Viper, loc ConfigLocation, err error
 		v.SetConfigType("yaml")
 		v.SetConfigName("hashy")
 		v.AddConfigPath(".")
-		v.AddConfigPath("$HOME")
+		v.AddConfigPath("$HOME/.hashy")
 		v.AddConfigPath("/etc/hashy")
 	}
 
