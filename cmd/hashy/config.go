@@ -8,8 +8,19 @@ import (
 	"time"
 )
 
+const (
+	DefaultDomain    = "hashy.net"
+	DefaultDiscovery = "_hashy.discover"
+)
+
 //go:embed defaultConfig.yaml
 var defaultConfig string
+
+// ZoneConfig describes the zone that hashy serves.
+type ZoneConfig struct {
+	// Domain is the domain that hash serves. If unset, this defaults to DefaultDomain.
+	Domain string `json:"domain" yaml:"domain" mapstructure:"domain"`
+}
 
 // ConfigLocation is a marker type for a component which holds where hashy's
 // configuration was loaded from.
@@ -51,8 +62,23 @@ type ServersConfig struct {
 	DNS DNSServersConfig `json:"dns" yaml:"dns" mapstructure:"dns"`
 }
 
+type GroupsConfig struct {
+	// Discovery is the domain hashy queries to discover group information. If unset, this defaults to
+	// DefaultDiscovery.
+	Discovery string `json:"discovery" yaml:"discovery" mapstructure:"discovery"`
+
+	// ZoneFiles is a list of filesystem globs that contain group information.
+	ZoneFiles []string `json:"zoneFiles" yaml:"zoneFiles" mapstructure:"zoneFiles"`
+}
+
 // Config is the top-level configuration object for the hashy server.
 type Config struct {
+	// Zone holds information about the zone that hashy serves.
+	Zone ZoneConfig `json:"zone" yaml:"zone" mapstructure:"zone"`
+
 	// Servers holds all the hashy server configurations.
 	Servers ServersConfig `json:"servers" yaml:"servers" mapstructure:"servers"`
+
+	// Groups describes how group information is obtained
+	Groups GroupsConfig `json:"groups" yaml:"groups" mapstructure:"groups"`
 }
