@@ -14,7 +14,7 @@ type IngestEvent struct {
 	Err error
 
 	// Groups holds the ingested groups.
-	Groups Groups
+	Groups *Groups
 }
 
 type IngestListener interface {
