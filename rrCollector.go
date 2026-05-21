@@ -106,7 +106,7 @@ type RRCollector struct {
 	// discoveryDomain is the DNS name that TXT records containing group information belong to
 	discoveryDomain string
 
-	nameGenerator ServerNameGenerator
+	nameGenerator *ServerNameGenerator
 
 	groups   collectedGroups
 	services collectedServices

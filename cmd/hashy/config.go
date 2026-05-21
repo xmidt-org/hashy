@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	DefaultDomain    = "hashy.net"
-	DefaultDiscovery = "_hashy.discover"
+	DefaultDomain              = "hashy.net"
+	DefaultDiscoveryDomain     = "_hashy.discover"
+	DefaultGeneratedNamePrefix = "hashy"
 )
 
 //go:embed defaultConfig.yaml
@@ -21,10 +22,6 @@ type ZoneConfig struct {
 	// Domain is the domain that hash serves. If unset, this defaults to DefaultDomain.
 	Domain string `json:"domain" yaml:"domain" mapstructure:"domain"`
 }
-
-// ConfigLocation is a marker type for a component which holds where hashy's
-// configuration was loaded from.
-type ConfigLocation string
 
 // UDPServerConfig is the configuration for a single UDP server that serve DNS traffic.
 type UDPServerConfig struct {
@@ -63,9 +60,13 @@ type ServersConfig struct {
 }
 
 type GroupsConfig struct {
-	// Discovery is the domain hashy queries to discover group information. If unset, this defaults to
-	// DefaultDiscovery.
-	Discovery string `json:"discovery" yaml:"discovery" mapstructure:"discovery"`
+	// DiscoveryDomain is the domain hashy queries to discover group information. If unset, this defaults to
+	// DefaultDiscoveryDomain.
+	DiscoveryDomain string `json:"discoveryDomain" yaml:"discoveryDomain" mapstructure:"discoveryDomain"`
+
+	// GeneratedNamePrefix is the prefix used when synthesizing host names for discovered servers.
+	// The default is DefaultGeneratedNamePrefix.
+	GeneratedNamePrefix string `json:"generatedNamePrefix" yaml:"generatedNamePrefix" mapstructure:"generatedNamePrefix"`
 
 	// ZoneFiles is a list of filesystem globs that contain group information.
 	ZoneFiles []string `json:"zoneFiles" yaml:"zoneFiles" mapstructure:"zoneFiles"`

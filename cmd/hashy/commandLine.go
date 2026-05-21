@@ -5,10 +5,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 
 	"github.com/alecthomas/kong"
 	"github.com/spf13/viper"
+	"github.com/xmidt-org/hashy"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
@@ -20,11 +22,10 @@ type CommandLine struct {
 	ConfFile string `name:"conf-file" help:"configuration file to read. If unset, /etc/hashy, $HOME/.hashy, and the current directory will be searched for hashy.yaml"`
 }
 
-func (cl *CommandLine) newViper() (v *viper.Viper, loc ConfigLocation, err error) {
+func (cl *CommandLine) newViper() (v *viper.Viper, err error) {
 	v = viper.New()
 	if len(cl.ConfFile) > 0 {
 		v.SetConfigFile(cl.ConfFile)
-		loc = ConfigLocation(cl.ConfFile)
 	} else {
 		v.SetConfigType("yaml")
 		v.SetConfigName("hashy")
@@ -33,21 +34,15 @@ func (cl *CommandLine) newViper() (v *viper.Viper, loc ConfigLocation, err error
 		v.AddConfigPath("/etc/hashy")
 	}
 
-	err = v.ReadInConfig()
-	switch {
-	case err == nil:
-		loc = ConfigLocation(v.ConfigFileUsed())
+	if err = v.ReadInConfig(); err == nil || len(cl.ConfFile) > 0 {
+		return
+	}
 
-	case len(cl.ConfFile) == 0:
-		// if a custom config file was specified but not found, we don't load the default config.
-		if _, notFound := errors.AsType[viper.ConfigFileNotFoundError](err); notFound {
-			// load the default configuration
-			v.SetConfigType("yaml")
-			err = v.ReadConfig(bytes.NewBufferString(defaultConfig))
-			if err == nil {
-				loc = ConfigLocation("default")
-			}
-		}
+	// if a custom config file was specified but not found, we don't load the default config.
+	if _, notFound := errors.AsType[viper.ConfigFileNotFoundError](err); notFound {
+		// load the default configuration
+		v.SetConfigType("yaml")
+		err = v.ReadConfig(bytes.NewBufferString(defaultConfig))
 	}
 
 	return
@@ -56,20 +51,42 @@ func (cl *CommandLine) newViper() (v *viper.Viper, loc ConfigLocation, err error
 // AfterApply sets up bindings for Run. Messages from these components are much easier to
 // read and debug when done outside an fx.App.
 func (cl *CommandLine) AfterApply(ctx *kong.Context) (err error) {
-	v, loc, err := cl.newViper()
+	v, err := cl.newViper()
 	if err == nil {
-		ctx.Bind(v, loc)
+		ctx.Bind(v)
 	}
 
 	return
 }
 
-func (cl *CommandLine) provideConfig(v *viper.Viper, loc ConfigLocation) (config Config, err error) {
+func (cl *CommandLine) provideConfig(v *viper.Viper) (config Config, err error) {
 	err = v.UnmarshalExact(&config)
+	if err == nil {
+		if len(config.Zone.Domain) == 0 {
+			config.Zone.Domain = DefaultDomain
+		}
+
+		if len(config.Groups.DiscoveryDomain) == 0 {
+			config.Groups.DiscoveryDomain = DefaultDiscoveryDomain
+		}
+
+		if len(config.Groups.GeneratedNamePrefix) == 0 {
+			config.Groups.GeneratedNamePrefix = DefaultGeneratedNamePrefix
+		}
+	}
+
 	return
 }
 
-func (cl *CommandLine) providerLogger(_ Config) (*zap.Logger, error) {
+func (cl *CommandLine) provideZoneConfig(config Config) ZoneConfig {
+	return config.Zone
+}
+
+func (cl *CommandLine) provideGroupsConfig(config Config) GroupsConfig {
+	return config.Groups
+}
+
+func (cl *CommandLine) provideLogger(_ Config) (*zap.Logger, error) {
 	return zap.NewDevelopment() // TODO
 }
 
@@ -77,18 +94,43 @@ func (cl *CommandLine) withLogger(l *zap.Logger) fxevent.Logger {
 	return &fxevent.ZapLogger{Logger: l}
 }
 
+func (cl *CommandLine) provideServerNameGenerator(zcfg ZoneConfig, gcfg GroupsConfig) *hashy.ServerNameGenerator {
+	return hashy.NewServerNameGenerator(
+		gcfg.GeneratedNamePrefix,
+		zcfg.Domain,
+	)
+}
+
+func (cl *CommandLine) provideFileIngester(nameGenerator *hashy.ServerNameGenerator, logger *zap.Logger, gcfg GroupsConfig) hashy.Ingester {
+	fi := &hashy.FileIngester{
+		Logger:          logger,
+		Globs:           gcfg.ZoneFiles,
+		DiscoveryDomain: gcfg.DiscoveryDomain,
+		NameGenerator:   nameGenerator,
+	}
+
+	return fi
+}
+
 // Run executes the hashy server.
-func (cl *CommandLine) Run(v *viper.Viper, loc ConfigLocation) error {
+func (cl *CommandLine) Run(v *viper.Viper) error {
 	app := fx.New(
-		fx.Supply(v, loc),
+		fx.Supply(v),
 		fx.WithLogger(cl.withLogger),
 		fx.Provide(
 			cl.provideConfig,
-			cl.providerLogger,
+			cl.provideZoneConfig,
+			cl.provideGroupsConfig,
+			cl.provideLogger,
+			cl.provideServerNameGenerator,
+			cl.provideFileIngester,
 		),
 		fx.Invoke(
-			func(l *zap.Logger) {
-				l.Info("configuration file used", zap.String("location", string(loc)))
+			func(v *viper.Viper, l *zap.Logger) {
+				l.Info("configuration file used", zap.String("location", v.ConfigFileUsed()))
+			},
+			func(ing hashy.Ingester) {
+				ing.Ingest(context.Background())
 			},
 		),
 	)

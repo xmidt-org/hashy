@@ -12,14 +12,16 @@ import (
 	"sync"
 
 	"codeberg.org/miekg/dns"
+	"go.uber.org/zap"
 )
 
 type FileIngester struct {
-	globs           []string
-	origin          string
-	defaultTTL      uint32
-	discoveryDomain string
-	nameGenerator   ServerNameGenerator
+	Logger          *zap.Logger
+	Globs           []string
+	Origin          string
+	DefaultTTL      uint32
+	DiscoveryDomain string
+	NameGenerator   *ServerNameGenerator
 
 	lock      sync.RWMutex
 	listeners []IngestListener
@@ -54,9 +56,9 @@ func (fi *FileIngester) ingestFile(ctx context.Context, rrc *RRCollector, path s
 	}
 
 	defer file.Close()
-	zp := dns.NewZoneParser(file, fi.origin, path)
+	zp := dns.NewZoneParser(file, fi.Origin, path)
 	zp.IncludeFS = os.DirFS(filepath.Dir(path)) // includes are relative to the location of the file
-	zp.SetDefaultTTL(fi.defaultTTL)
+	zp.SetDefaultTTL(fi.DefaultTTL)
 
 	for rr, err := range zp.RRs() {
 		if err != nil {
@@ -82,12 +84,12 @@ func (fi *FileIngester) dispatchIngestEvent(event IngestEvent) {
 func (fi *FileIngester) Ingest(ctx context.Context) {
 	var event IngestEvent
 	rrc := RRCollector{
-		discoveryDomain: fi.discoveryDomain,
-		nameGenerator:   fi.nameGenerator,
+		discoveryDomain: fi.DiscoveryDomain,
+		nameGenerator:   fi.NameGenerator,
 	}
 
 	var paths []string
-	for _, glob := range fi.globs {
+	for _, glob := range fi.Globs {
 		matches, err := filepath.Glob(glob)
 		if err != nil {
 			event.Err = err
