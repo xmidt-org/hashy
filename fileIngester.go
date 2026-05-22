@@ -65,7 +65,7 @@ func (fi *FileIngester) ingestFile(ctx context.Context, rrc *RRCollector, path s
 			return err
 		}
 
-		if err := rrc.Add(rr); err != nil {
+		if err := rrc.AddRR(rr); err != nil {
 			return err
 		}
 	}
@@ -102,15 +102,27 @@ func (fi *FileIngester) Ingest(ctx context.Context) {
 	}
 
 	if event.Err == nil {
-		for _, path := range paths {
-			if err := fi.ingestFile(ctx, &rrc, path); err != nil {
-				event.Err = err
-			}
-		}
+		fi.Logger.Info("zone files to parse", zap.Int("fileCount", len(paths)), zap.Strings("files", paths))
+	}
+
+	var pathIndex int
+	for pathIndex = 0; pathIndex < len(paths) && event.Err == nil; pathIndex++ {
+		path := paths[pathIndex]
+		ingestLogger := fi.Logger.With(zap.String("path", path))
+		ingestLogger.Debug("parsing zone file")
+
+		event.Err = fi.ingestFile(
+			ctx,
+			&rrc,
+			path,
+		)
 	}
 
 	if event.Err == nil {
+		fi.Logger.Info("parsing complete", zap.Int("fileCount", pathIndex))
 		event.Groups = rrc.Build()
+	} else {
+		fi.Logger.Error("failed to parse zone files", zap.Error(event.Err))
 	}
 
 	fi.dispatchIngestEvent(event)

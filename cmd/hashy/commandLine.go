@@ -63,15 +63,15 @@ func (cl *CommandLine) provideConfig(v *viper.Viper) (config Config, err error) 
 	err = v.UnmarshalExact(&config)
 	if err == nil {
 		if len(config.Zone.Domain) == 0 {
-			config.Zone.Domain = DefaultDomain
+			config.Zone.Domain = hashy.DefaultGeneratedServerDomain
 		}
 
 		if len(config.Groups.DiscoveryDomain) == 0 {
-			config.Groups.DiscoveryDomain = DefaultDiscoveryDomain
+			config.Groups.DiscoveryDomain = hashy.DefaultDiscoveryDomain
 		}
 
 		if len(config.Groups.GeneratedNamePrefix) == 0 {
-			config.Groups.GeneratedNamePrefix = DefaultGeneratedNamePrefix
+			config.Groups.GeneratedNamePrefix = hashy.DefaultGeneratedServerNamePrefix
 		}
 	}
 

@@ -8,12 +8,6 @@ import (
 	"time"
 )
 
-const (
-	DefaultDomain              = "hashy.net"
-	DefaultDiscoveryDomain     = "_hashy.discover"
-	DefaultGeneratedNamePrefix = "hashy"
-)
-
 //go:embed defaultConfig.yaml
 var defaultConfig string
 
