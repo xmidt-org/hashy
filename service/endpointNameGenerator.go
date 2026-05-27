@@ -3,6 +3,8 @@ package service
 import (
 	"fmt"
 	"iter"
+
+	"codeberg.org/miekg/dns/dnsutil"
 )
 
 const (
@@ -22,6 +24,8 @@ type EndpointNameGenerator struct {
 }
 
 // GenerateNames generates synthetic names for all endpoints within the given Group.
+// All generated names will be FQDNs.
+//
 // This method is idempotent.
 func (gen EndpointNameGenerator) GenerateNames(g *Group) {
 	prefix := gen.Prefix
@@ -33,6 +37,9 @@ func (gen EndpointNameGenerator) GenerateNames(g *Group) {
 	if len(domain) == 0 {
 		domain = DefaultGeneratedEndpointDomain
 	}
+
+	// ensure that the generated name is a FQDN, i.e. ends in a '.'
+	domain = dnsutil.Fqdn(domain)
 
 	i := 0
 	for endpoint := range g.Endpoints() {

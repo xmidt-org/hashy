@@ -7,12 +7,14 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"sort"
 	"sync"
 	"time"
 
 	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 	"go.uber.org/zap"
 )
 
@@ -33,22 +35,25 @@ type FileIngester struct {
 	listeners []IngestListener
 }
 
-func (fi *FileIngester) AddIngestListener(l IngestListener) {
+func (fi *FileIngester) AddIngestListeners(more ...IngestListener) {
 	fi.lock.Lock()
-	fi.listeners = append(fi.listeners, l)
+	fi.listeners = append(fi.listeners, more...)
 	fi.lock.Unlock()
 }
 
-func (fi *FileIngester) RemoveIngestListener(l IngestListener) {
+func (fi *FileIngester) RemoveIngestListeners(less ...IngestListener) {
 	fi.lock.Lock()
 	defer fi.lock.Unlock()
 
-	for i := 0; i < len(fi.listeners); i++ {
-		if fi.listeners[i] == l {
-			fi.listeners = slices.Delete(fi.listeners, i, i+1)
-			return
+	fi.listeners = slices.DeleteFunc(fi.listeners, func(candidate IngestListener) bool {
+		for _, toRemove := range less {
+			if toRemove == candidate {
+				return true
+			}
 		}
-	}
+
+		return false
+	})
 }
 
 func (fi *FileIngester) ingestFile(ctx context.Context, l *zap.Logger, rrc *RRCollector, path string) error {
@@ -86,6 +91,7 @@ func (fi *FileIngester) dispatchIngestEvent(event IngestEvent) {
 	fi.lock.RLock()
 	defer fi.lock.RUnlock()
 	for _, l := range fi.listeners {
+		fi.Logger.Debug("dispatching event", zap.Stringer("listener", reflect.TypeOf(l)))
 		l.OnIngest(event)
 	}
 }
@@ -100,6 +106,7 @@ func (fi *FileIngester) newRRCollector() (rrc RRCollector) {
 		rrc.discoveryDomain = DefaultDiscoveryDomain
 	}
 
+	rrc.discoveryDomain = dnsutil.Fqdn(rrc.discoveryDomain)
 	return
 }
 

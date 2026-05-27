@@ -26,9 +26,9 @@ func Provide() fx.Option {
 					Domain: zcfg.Domain,
 				}
 			},
-			func(l *zap.Logger, eng EndpointNameGenerator, gcfg config.Groups) *FileIngester {
+			func(base *zap.Logger, eng EndpointNameGenerator, gcfg config.Groups) *FileIngester {
 				return &FileIngester{
-					Logger:          l,
+					Logger:          base.Named("fileIngester"),
 					ZoneFiles:       gcfg.ZoneFiles,
 					Origin:          gcfg.Origin,
 					DefaultTTL:      hashy.DurationToSeconds(gcfg.DefaultTTL),
@@ -36,17 +36,27 @@ func Provide() fx.Option {
 					NameGenerator:   eng,
 				}
 			},
-			func(fi *FileIngester, gcfg config.Groups) *Locator {
-				l := &Locator{
+			func(base *zap.Logger, fi *FileIngester, gcfg config.Groups) *Locator {
+				return &Locator{
+					logger: base.Named("locator"),
 					builder: new(consistent.Builder[string, *Endpoint]).
 						VNodes(gcfg.VNodes),
 				}
-
-				fi.AddIngestListener(l)
-				return l
 			},
+			fx.Annotate(
+				func(loc *Locator) IngestListener {
+					return loc
+				},
+				fx.ResultTags(`group:"ingestListeners"`),
+			),
 		),
 		fx.Invoke(
+			fx.Annotate(
+				func(fi *FileIngester, listeners []IngestListener) {
+					fi.AddIngestListeners(listeners...)
+				},
+				fx.ParamTags(``, `group:"ingestListeners"`),
+			),
 			func(fi *FileIngester) {
 				fi.Ingest(context.Background())
 			},

@@ -24,3 +24,5 @@ groups:
 logging:
   development: true
   level: DEBUG
+  encoding: console
+
