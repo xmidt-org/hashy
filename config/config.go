@@ -16,6 +16,9 @@ var Default string
 type Zone struct {
 	// Domain is the domain that hash serves. If unset, this defaults to DefaultDomain.
 	Domain string `json:"domain" yaml:"domain" mapstructure:"domain"`
+
+	// TTL is the base time-to-live of records generated in this zone.
+	TTL time.Duration `json:"ttl" yaml:"ttl" mapstructure:"ttl"`
 }
 
 // UDP is the configuration for a single UDP server that serve DNS traffic.

@@ -3,6 +3,7 @@ package server
 import (
 	"codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
+	"github.com/xmidt-org/hashy"
 	"github.com/xmidt-org/hashy/config"
 	"github.com/xmidt-org/hashy/service"
 	"go.uber.org/fx"
@@ -21,6 +22,12 @@ func Provide() fx.Option {
 
 				if len(h.Domain) == 0 {
 					h.Domain = DefaultZoneDomain
+				}
+
+				if z.TTL > 0 {
+					h.TTL = hashy.DurationToSeconds(z.TTL)
+				} else {
+					h.TTL = hashy.DurationToSeconds(DefaultZoneTTL)
 				}
 
 				h.Domain = dnsutil.Fqdn(h.Domain)

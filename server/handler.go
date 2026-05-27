@@ -5,15 +5,22 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"time"
 
 	"codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
+	"codeberg.org/miekg/dns/rdata"
 	"github.com/xmidt-org/hashy/service"
 	"go.uber.org/zap"
 )
 
 const (
+	// DefaultZoneDomain is the default DNS domain that hashy serves.
 	DefaultZoneDomain = service.DefaultGeneratedEndpointDomain
+
+	// DefaultZoneTTL is the default time-to-live for records generated within
+	// hashy's zone.
+	DefaultZoneTTL time.Duration = 5 * time.Minute
 
 	// HashLabelPrefix is the prefix, without a hyphen, of domain names requesting
 	// a hash. This prefix can be used to make hash objects that start with numbers
@@ -29,9 +36,17 @@ var (
 )
 
 type HashRequest struct {
+	Name string
+
 	Prefix string
 	Object string
 	Extra  []string
+
+	// A indicates whether this request is asking for A records.
+	A bool
+
+	// AAAA indicates whether this request is asking for AAAA records.
+	AAAA bool
 }
 
 // Handler is the main DNS handler for hashy.
@@ -40,12 +55,12 @@ type HashRequest struct {
 type Handler struct {
 	Domain  string
 	Locator *service.Locator
+	TTL     uint32
 }
 
 // parseRequest validates and parses a request dns.Message into a HashRequest.
 func (h *Handler) parseRequest(request *dns.Msg) (hr HashRequest, err error) {
 	request.Unpack()
-
 	if len(request.Question) != 1 {
 		err = errQuestionCount
 		return
@@ -94,17 +109,48 @@ func (h *Handler) parseRequest(request *dns.Msg) (hr HashRequest, err error) {
 		}
 	}
 
+	switch question.Data().(type) {
+	case rdata.A:
+		hr.A = true
+
+	case rdata.AAAA:
+		hr.AAAA = true
+	}
+
+	// NOTE: an empty Name will cause response.Pack() to panic
+	hr.Name = requestDomain
+
 	return
 }
 
 // handleRequest handles a valid HashRequest.
 func (h *Handler) handleRequest(_ context.Context, logger *zap.Logger, response *dns.Msg, request HashRequest) {
 	logger.Debug("handleRequest", zap.Any("request", request))
-	response.Rcode = dns.RcodeRefused
+	response.Rcode = dns.RcodeSuccess
+
+	for _, endpoint := range h.Locator.FindString(request.Object) {
+		if request.A {
+			for addr := range endpoint.A() {
+				response.Answer = append(response.Answer, &dns.A{
+					Hdr: dns.Header{
+						Name:  request.Name,
+						TTL:   h.TTL, // TODO: jitter?
+						Class: dns.ClassINET,
+					},
+					A: rdata.A{
+						Addr: addr,
+					},
+				})
+			}
+		}
+	}
 }
 
+// ServeDNS contains hashy's main logic. It responds to DNS queries by using a service.Locator to generate
+// DNS responses.
 func (h *Handler) ServeDNS(ctx context.Context, logger *zap.Logger, writer dns.ResponseWriter, request *dns.Msg) {
-	response := dnsutil.SetReply(request.Copy(), request)
+	response := request.Copy()
+	dnsutil.SetReply(response, request)
 	hashRequest, err := h.parseRequest(request)
 
 	if err != nil {
@@ -115,10 +161,14 @@ func (h *Handler) ServeDNS(ctx context.Context, logger *zap.Logger, writer dns.R
 		}
 
 		logger.Error("bad request", zap.Error(err))
-	} else {
-		h.handleRequest(ctx, logger, response, hashRequest)
+		return
 	}
 
-	response.Pack()
+	h.handleRequest(ctx, logger, response, hashRequest)
+	if err := response.Pack(); err != nil {
+		logger.Error("unable to pack response", zap.Error(err))
+		return
+	}
+
 	io.Copy(writer, response)
 }
