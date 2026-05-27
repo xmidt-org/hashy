@@ -1,4 +1,4 @@
-package hashy
+package service
 
 import (
 	"maps"
@@ -15,7 +15,7 @@ type serverDefinition struct {
 
 // newServer creates a Server from this definition. The A and AAAA records
 // will be deduped and sorted.
-func (sdef serverDefinition) newServer() (s Server) {
+func (sdef serverDefinition) newServer() (s Endpoint) {
 	s.originalName = sdef.originalName
 
 	if len(sdef.a) > 0 {
@@ -68,7 +68,7 @@ func (sdc serverDefinitionCollector) clear() {
 }
 
 func (sdc *serverDefinitionCollector) addA(serverName string, addrs ...netip.Addr) {
-	if sdc == nil {
+	if *sdc == nil {
 		*sdc = make(serverDefinitionCollector)
 	}
 
@@ -85,7 +85,7 @@ func (sdc *serverDefinitionCollector) addA(serverName string, addrs ...netip.Add
 }
 
 func (sdc *serverDefinitionCollector) addAAAA(serverName string, addrs ...netip.Addr) {
-	if sdc == nil {
+	if *sdc == nil {
 		*sdc = make(serverDefinitionCollector)
 	}
 
@@ -105,10 +105,10 @@ func (sdc *serverDefinitionCollector) addAAAA(serverName string, addrs ...netip.
 // will be deduped and sorted.
 //
 // If no such server exists in this collector, a blank Server is returned along with false.
-func (sdc serverDefinitionCollector) newServer(serverName string) (Server, bool) {
+func (sdc serverDefinitionCollector) newServer(serverName string) (Endpoint, bool) {
 	if sdef := sdc[serverName]; sdef != nil {
 		return sdef.newServer(), true
 	}
 
-	return Server{originalName: serverName}, false
+	return Endpoint{originalName: serverName}, false
 }

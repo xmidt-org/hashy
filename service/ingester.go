@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package hashy
+package service
 
 import (
 	"context"
@@ -13,7 +13,7 @@ type IngestEvent struct {
 	// should be ignored.
 	Err error
 
-	// Groups holds the ingested groups.
+	// Lists holds the ingested groups.
 	Groups *Groups
 }
 

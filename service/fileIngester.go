@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package hashy
+package service
 
 import (
 	"context"
@@ -10,18 +10,24 @@ import (
 	"slices"
 	"sort"
 	"sync"
+	"time"
 
 	"codeberg.org/miekg/dns"
 	"go.uber.org/zap"
 )
 
+const (
+	DefaultFileIngesterOrigin = ""
+	DefaultFileIngesterTTL    = 5 * time.Minute
+)
+
 type FileIngester struct {
 	Logger          *zap.Logger
-	Globs           []string
+	ZoneFiles       []string
 	Origin          string
 	DefaultTTL      uint32
 	DiscoveryDomain string
-	NameGenerator   *ServerNameGenerator
+	NameGenerator   EndpointNameGenerator
 
 	lock      sync.RWMutex
 	listeners []IngestListener
@@ -81,15 +87,26 @@ func (fi *FileIngester) dispatchIngestEvent(event IngestEvent) {
 	}
 }
 
-func (fi *FileIngester) Ingest(ctx context.Context) {
-	var event IngestEvent
-	rrc := RRCollector{
+func (fi *FileIngester) newRRCollector() (rrc RRCollector) {
+	rrc = RRCollector{
 		discoveryDomain: fi.DiscoveryDomain,
 		nameGenerator:   fi.NameGenerator,
 	}
 
+	if len(rrc.discoveryDomain) == 0 {
+		rrc.discoveryDomain = DefaultDiscoveryDomain
+	}
+
+	return
+}
+
+func (fi *FileIngester) Ingest(ctx context.Context) {
+	var event IngestEvent
+	rrc := fi.newRRCollector()
+
 	var paths []string
-	for _, glob := range fi.Globs {
+	for _, glob := range fi.ZoneFiles {
+		glob = os.ExpandEnv(glob)
 		matches, err := filepath.Glob(glob)
 		if err != nil {
 			event.Err = err

@@ -5,12 +5,17 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"slices"
 
 	"github.com/alecthomas/kong"
 	"github.com/spf13/viper"
-	"github.com/xmidt-org/hashy"
+	"github.com/xmidt-org/hashy/config"
+	"github.com/xmidt-org/hashy/server"
+	"github.com/xmidt-org/hashy/service"
+	"github.com/xmidt-org/sallust"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
@@ -18,8 +23,8 @@ import (
 
 // CommandLine represents the hashy command line.
 type CommandLine struct {
-	DevMode  bool   `name:"dev" default:"false" help:"developer mode, a standard configuration useful for trying out hashy"`
-	ConfFile string `name:"conf-file" help:"configuration file to read. If unset, /etc/hashy, $HOME/.hashy, and the current directory will be searched for hashy.yaml"`
+	ConfFile  string   `name:"conf-file" help:"configuration file to read. If unset, /etc/hashy, $HOME/.hashy, and the current directory will be searched for hashy.yaml"`
+	ZoneFiles []string `name:"zone-files" help:"additional globs for zone files. Will be appended to configuration. Relative paths are resolved relative to the conf file."`
 }
 
 func (cl *CommandLine) newViper() (v *viper.Viper, err error) {
@@ -42,7 +47,7 @@ func (cl *CommandLine) newViper() (v *viper.Viper, err error) {
 	if _, notFound := errors.AsType[viper.ConfigFileNotFoundError](err); notFound {
 		// load the default configuration
 		v.SetConfigType("yaml")
-		err = v.ReadConfig(bytes.NewBufferString(defaultConfig))
+		err = v.ReadConfig(bytes.NewBufferString(config.Default))
 	}
 
 	return
@@ -59,78 +64,56 @@ func (cl *CommandLine) AfterApply(ctx *kong.Context) (err error) {
 	return
 }
 
-func (cl *CommandLine) provideConfig(v *viper.Viper) (config Config, err error) {
-	err = v.UnmarshalExact(&config)
-	if err == nil {
-		if len(config.Zone.Domain) == 0 {
-			config.Zone.Domain = hashy.DefaultGeneratedServerDomain
-		}
-
-		if len(config.Groups.DiscoveryDomain) == 0 {
-			config.Groups.DiscoveryDomain = hashy.DefaultDiscoveryDomain
-		}
-
-		if len(config.Groups.GeneratedNamePrefix) == 0 {
-			config.Groups.GeneratedNamePrefix = hashy.DefaultGeneratedServerNamePrefix
-		}
-	}
-
-	return
-}
-
-func (cl *CommandLine) provideZoneConfig(config Config) ZoneConfig {
-	return config.Zone
-}
-
-func (cl *CommandLine) provideGroupsConfig(config Config) GroupsConfig {
-	return config.Groups
-}
-
-func (cl *CommandLine) provideLogger(_ Config) (*zap.Logger, error) {
-	return zap.NewDevelopment() // TODO
-}
-
-func (cl *CommandLine) withLogger(l *zap.Logger) fxevent.Logger {
-	return &fxevent.ZapLogger{Logger: l}
-}
-
-func (cl *CommandLine) provideServerNameGenerator(zcfg ZoneConfig, gcfg GroupsConfig) *hashy.ServerNameGenerator {
-	return hashy.NewServerNameGenerator(
-		gcfg.GeneratedNamePrefix,
-		zcfg.Domain,
+func (cl *CommandLine) provideLogging() fx.Option {
+	return fx.Options(
+		fx.Provide(
+			func(_ sallust.Config) (*zap.Logger, error) {
+				return zap.NewDevelopment() // TODO
+			},
+		),
+		fx.WithLogger(
+			func(l *zap.Logger) fxevent.Logger {
+				return &fxevent.ZapLogger{Logger: l}
+			},
+		),
 	)
 }
 
-func (cl *CommandLine) provideFileIngester(nameGenerator *hashy.ServerNameGenerator, logger *zap.Logger, gcfg GroupsConfig) hashy.Ingester {
-	fi := &hashy.FileIngester{
-		Logger:          logger,
-		Globs:           gcfg.ZoneFiles,
-		DiscoveryDomain: gcfg.DiscoveryDomain,
-		NameGenerator:   nameGenerator,
+// decorateGroups adds the command-line zone files, if any, to the ZoneFiles configuration
+// value. Additionally, all ZoneFiles are expanded.
+func (cl *CommandLine) decorateGroups(v *viper.Viper, gcfg config.Groups) config.Groups {
+	gcfg.ZoneFiles = slices.Grow(gcfg.ZoneFiles, len(cl.ZoneFiles))
+	gcfg.ZoneFiles = append(gcfg.ZoneFiles, cl.ZoneFiles...)
+
+	configLocation := v.ConfigFileUsed()
+	if len(configLocation) > 0 {
+		configLocation = filepath.Dir(configLocation)
 	}
 
-	return fi
+	for i, glob := range gcfg.ZoneFiles {
+		glob = os.ExpandEnv(glob)
+		if !filepath.IsAbs(glob) {
+			glob = filepath.Join(configLocation, glob)
+		}
+
+		gcfg.ZoneFiles[i] = glob
+	}
+
+	return gcfg
 }
 
 // Run executes the hashy server.
 func (cl *CommandLine) Run(v *viper.Viper) error {
 	app := fx.New(
 		fx.Supply(v),
-		fx.WithLogger(cl.withLogger),
-		fx.Provide(
-			cl.provideConfig,
-			cl.provideZoneConfig,
-			cl.provideGroupsConfig,
-			cl.provideLogger,
-			cl.provideServerNameGenerator,
-			cl.provideFileIngester,
-		),
+		cl.provideLogging(),
+		config.Provide(),
+		service.Provide(),
+		server.Provide(),
+		fx.Decorate(cl.decorateGroups),
 		fx.Invoke(
 			func(v *viper.Viper, l *zap.Logger) {
 				l.Info("configuration file used", zap.String("location", v.ConfigFileUsed()))
-			},
-			func(ing hashy.Ingester) {
-				ing.Ingest(context.Background())
 			},
 		),
 	)
