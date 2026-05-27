@@ -37,11 +37,10 @@ func (d *decorator) ServeDNS(ctx context.Context, response dns.ResponseWriter, r
 	)
 
 	defer func() {
-		duration := time.Since(start)
 		if r := recover(); r != nil {
-			logger.Error("panic during request", zap.Duration("duration", duration), zap.Any("value", r))
+			logger.Error("panic during request", zap.Duration("duration", time.Since(start)), zap.Any("value", r))
 		} else {
-			logger.Info("request finished", zap.Duration("duration", duration))
+			logger.Info("request finished", zap.Duration("duration", time.Since(start)))
 		}
 	}()
 

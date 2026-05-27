@@ -2,6 +2,7 @@ package server
 
 import (
 	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 	"github.com/xmidt-org/hashy/config"
 	"github.com/xmidt-org/hashy/service"
 	"go.uber.org/fx"
@@ -22,6 +23,7 @@ func Provide() fx.Option {
 					h.Domain = DefaultZoneDomain
 				}
 
+				h.Domain = dnsutil.Fqdn(h.Domain)
 				return h
 			},
 			func(base *zap.Logger, h *Handler) *Middleware {
