@@ -1,0 +1,13 @@
+$ORIGIN xmidt.comcast.net.
+$TTL 3600
+
+_hashy.discover.                                TXT     "useast1 _talaria._tcp.useast1.xmidt.comcast.net."
+
+_talaria._tcp.useast1.xmidt.comcast.net.        SRV      0 0 8080 talaria-1.useast1.xmidt.comcast.net.
+_talaria._tcp.useast1.xmidt.comcast.net.        SRV      0 0 8080 talaria-2.useast1.xmidt.comcast.net.
+_talaria._tcp.useast1.xmidt.comcast.net.        SRV      0 0 8080 talaria-3.useast1.xmidt.comcast.net.
+ 
+talaria-1.useast1                                 A        192.168.1.1
+talaria-2.useast1                                 A        192.168.1.2
+talaria-3.useast1                                 A        192.168.1.3
+ 

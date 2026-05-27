@@ -51,7 +51,7 @@ func (fi *FileIngester) RemoveIngestListener(l IngestListener) {
 	}
 }
 
-func (fi *FileIngester) ingestFile(ctx context.Context, rrc *RRCollector, path string) error {
+func (fi *FileIngester) ingestFile(ctx context.Context, l *zap.Logger, rrc *RRCollector, path string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -62,15 +62,18 @@ func (fi *FileIngester) ingestFile(ctx context.Context, rrc *RRCollector, path s
 	}
 
 	defer file.Close()
-	zp := dns.NewZoneParser(file, fi.Origin, path)
+	zp := dns.NewZoneParser(file, "", "")
 	zp.IncludeFS = os.DirFS(filepath.Dir(path)) // includes are relative to the location of the file
 	zp.SetDefaultTTL(fi.DefaultTTL)
 
 	for rr, err := range zp.RRs() {
-		if err != nil {
+		if rr == nil {
+			// a successful end is a nil RR and a nil error
+			// otherwise, err will hold any error that occurred
 			return err
 		}
 
+		l.Debug("resource record", zap.Stringer("rr", rr))
 		if err := rrc.AddRR(rr); err != nil {
 			return err
 		}
@@ -130,6 +133,7 @@ func (fi *FileIngester) Ingest(ctx context.Context) {
 
 		event.Err = fi.ingestFile(
 			ctx,
+			ingestLogger,
 			&rrc,
 			path,
 		)

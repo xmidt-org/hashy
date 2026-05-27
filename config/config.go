@@ -88,6 +88,5 @@ type Main struct {
 	Groups Groups `json:"groups" yaml:"groups" mapstructure:"groups"`
 
 	// Logging is the server logging configuration.
-	// TODO: Not used right now.
 	Logging sallust.Config `json:"logging" yaml:"logging" mapstructure:"logging"`
 }

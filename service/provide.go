@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+
 	"github.com/xmidt-org/hashy"
 	"github.com/xmidt-org/hashy/config"
 	"github.com/xmidt-org/medley/consistent"
@@ -42,6 +44,11 @@ func Provide() fx.Option {
 
 				fi.AddIngestListener(l)
 				return l
+			},
+		),
+		fx.Invoke(
+			func(fi *FileIngester) {
+				fi.Ingest(context.Background())
 			},
 		),
 	)

@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"os"
-	"path/filepath"
 	"slices"
 
 	"github.com/alecthomas/kong"
@@ -23,6 +22,8 @@ import (
 
 // CommandLine represents the hashy command line.
 type CommandLine struct {
+	Verbose   bool     `help:"turns on verbose logging, which includes the fx.App startup logs"`
+	Debug     *bool    `help:"turns on debugging, overriding configuration"`
 	ConfFile  string   `name:"conf-file" help:"configuration file to read. If unset, /etc/hashy, $HOME/.hashy, and the current directory will be searched for hashy.yaml"`
 	ZoneFiles []string `name:"zone-files" help:"additional globs for zone files. Will be appended to configuration. Relative paths are resolved relative to the conf file."`
 }
@@ -53,6 +54,30 @@ func (cl *CommandLine) newViper() (v *viper.Viper, err error) {
 	return
 }
 
+// decorateGroups adds the command-line zone files, if any, to the ZoneFiles configuration
+// value. Additionally, all ZoneFiles are expanded.
+func (cl *CommandLine) decorateGroups(l *zap.Logger, gcfg config.Groups) config.Groups {
+	gcfg.ZoneFiles = slices.Grow(gcfg.ZoneFiles, len(cl.ZoneFiles))
+	gcfg.ZoneFiles = append(gcfg.ZoneFiles, cl.ZoneFiles...)
+
+	for i, glob := range gcfg.ZoneFiles {
+		gcfg.ZoneFiles[i] = os.ExpandEnv(glob)
+	}
+
+	return gcfg
+}
+
+func (cl *CommandLine) decorateSallust(cfg sallust.Config) sallust.Config {
+	switch {
+	case cl.Debug != nil && *cl.Debug:
+		cfg.Level = zap.DebugLevel.String()
+	case cl.Debug != nil && !*cl.Debug:
+		cfg.Level = zap.InfoLevel.String()
+	}
+
+	return cfg
+}
+
 // AfterApply sets up bindings for Run. Messages from these components are much easier to
 // read and debug when done outside an fx.App.
 func (cl *CommandLine) AfterApply(ctx *kong.Context) (err error) {
@@ -73,33 +98,18 @@ func (cl *CommandLine) provideLogging() fx.Option {
 		),
 		fx.WithLogger(
 			func(l *zap.Logger) fxevent.Logger {
-				return &fxevent.ZapLogger{Logger: l}
+				if cl.Verbose {
+					return &fxevent.ZapLogger{
+						Logger: l,
+					}
+				} else {
+					return &fxevent.ZapLogger{
+						Logger: zap.NewNop(),
+					}
+				}
 			},
 		),
 	)
-}
-
-// decorateGroups adds the command-line zone files, if any, to the ZoneFiles configuration
-// value. Additionally, all ZoneFiles are expanded.
-func (cl *CommandLine) decorateGroups(v *viper.Viper, gcfg config.Groups) config.Groups {
-	gcfg.ZoneFiles = slices.Grow(gcfg.ZoneFiles, len(cl.ZoneFiles))
-	gcfg.ZoneFiles = append(gcfg.ZoneFiles, cl.ZoneFiles...)
-
-	configLocation := v.ConfigFileUsed()
-	if len(configLocation) > 0 {
-		configLocation = filepath.Dir(configLocation)
-	}
-
-	for i, glob := range gcfg.ZoneFiles {
-		glob = os.ExpandEnv(glob)
-		if !filepath.IsAbs(glob) {
-			glob = filepath.Join(configLocation, glob)
-		}
-
-		gcfg.ZoneFiles[i] = glob
-	}
-
-	return gcfg
 }
 
 // Run executes the hashy server.
@@ -110,7 +120,10 @@ func (cl *CommandLine) Run(v *viper.Viper) error {
 		config.Provide(),
 		service.Provide(),
 		server.Provide(),
-		fx.Decorate(cl.decorateGroups),
+		fx.Decorate(
+			cl.decorateGroups,
+			cl.decorateSallust,
+		),
 		fx.Invoke(
 			func(v *viper.Viper, l *zap.Logger) {
 				l.Info("configuration file used", zap.String("location", v.ConfigFileUsed()))
