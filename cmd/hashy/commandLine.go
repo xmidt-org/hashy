@@ -67,8 +67,8 @@ func (cl *CommandLine) AfterApply(ctx *kong.Context) (err error) {
 func (cl *CommandLine) provideLogging() fx.Option {
 	return fx.Options(
 		fx.Provide(
-			func(_ sallust.Config) (*zap.Logger, error) {
-				return zap.NewDevelopment() // TODO
+			func(cfg sallust.Config) (*zap.Logger, error) {
+				return cfg.Build()
 			},
 		),
 		fx.WithLogger(

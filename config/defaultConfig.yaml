@@ -20,3 +20,6 @@ dns:
 groups:
   zoneFiles:
     - "$HOME/.hashy/**/*.zone"
+
+logging:
+  development: true
