@@ -46,13 +46,7 @@ func (fi *FileIngester) RemoveIngestListeners(less ...IngestListener) {
 	defer fi.lock.Unlock()
 
 	fi.listeners = slices.DeleteFunc(fi.listeners, func(candidate IngestListener) bool {
-		for _, toRemove := range less {
-			if toRemove == candidate {
-				return true
-			}
-		}
-
-		return false
+		return slices.Contains(less, candidate)
 	})
 }
 
