@@ -16,21 +16,23 @@ func Provide() fx.Option {
 		fx.Provide(
 			func(z config.Zone, loc *service.Locator) *Handler {
 				h := &Handler{
-					Domain:  z.Domain,
-					Locator: loc,
+					zoneDomain: z.Domain,
+					locator:    loc,
 				}
 
-				if len(h.Domain) == 0 {
-					h.Domain = DefaultZoneDomain
+				if len(h.zoneDomain) == 0 {
+					h.zoneDomain = DefaultZoneDomain
 				}
+
+				h.groupsDomain = dnsutil.Join(GroupsLabel, h.zoneDomain)
 
 				if z.TTL > 0 {
-					h.TTL = hashy.DurationToSeconds(z.TTL)
+					h.ttl = hashy.DurationToSeconds(z.TTL)
 				} else {
-					h.TTL = hashy.DurationToSeconds(DefaultZoneTTL)
+					h.ttl = hashy.DurationToSeconds(DefaultZoneTTL)
 				}
 
-				h.Domain = dnsutil.Fqdn(h.Domain)
+				h.zoneDomain = dnsutil.Fqdn(h.zoneDomain)
 				return h
 			},
 			func(base *zap.Logger, h *Handler) *Middleware {

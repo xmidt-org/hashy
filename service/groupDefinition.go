@@ -6,6 +6,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -84,6 +85,27 @@ func ParseGroupDefinition(txt string) (gdef GroupDefinition, err error) {
 
 	if err != nil {
 		err = fmt.Errorf("invalid group definition [%s]: %s", txt, err)
+	}
+
+	return
+}
+
+// MergeGroupDefinitions merges each of a sequence of definitions into a single definition.
+// The returned definition has the name of the first definition passed to this function.
+// The services are merged into a single slice, but are not deduped or sorted.
+//
+// If no definitions are passed to this function, it returns an empty definition.
+func MergeGroupDefinitions(defs ...GroupDefinition) (merged GroupDefinition) {
+	switch {
+	case len(defs) == 1:
+		merged = defs[0]
+
+	case len(defs) > 1:
+		merged.Name = defs[0].Name
+		for _, d := range defs {
+			merged.Services = slices.Grow(merged.Services, len(d.Services))
+			merged.Services = append(merged.Services, d.Services...)
+		}
 	}
 
 	return

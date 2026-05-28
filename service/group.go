@@ -10,6 +10,7 @@ import (
 // Group is a single group of servers.
 type Group struct {
 	name      string
+	services  []string
 	endpoints []Endpoint
 }
 
@@ -31,7 +32,7 @@ func (g *Group) Endpoints() iter.Seq[*Endpoint] {
 	}
 }
 
-// Groups is an immutable collection of List instances.
+// Groups is an immutable collection of Group instances.
 type Groups struct {
 	byName map[string]int
 	all    []Group

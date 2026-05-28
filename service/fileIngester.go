@@ -7,7 +7,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"sort"
 	"sync"
@@ -85,7 +84,6 @@ func (fi *FileIngester) dispatchIngestEvent(event IngestEvent) {
 	fi.lock.RLock()
 	defer fi.lock.RUnlock()
 	for _, l := range fi.listeners {
-		fi.Logger.Debug("dispatching event", zap.Stringer("listener", reflect.TypeOf(l)))
 		l.OnIngest(event)
 	}
 }

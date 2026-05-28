@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
 	"codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
-	"codeberg.org/miekg/dns/rdata"
 	"github.com/xmidt-org/hashy/service"
 	"go.uber.org/zap"
 )
@@ -21,6 +21,9 @@ const (
 	// DefaultZoneTTL is the default time-to-live for records generated within
 	// hashy's zone.
 	DefaultZoneTTL time.Duration = 5 * time.Minute
+
+	// GroupsLabel defines the subdomain of the zone domain that handles group DNS lookups.
+	GroupsLabel = "groups"
 
 	// HashLabelPrefix is the prefix, without a hyphen, of domain names requesting
 	// a hash. This prefix can be used to make hash objects that start with numbers
@@ -42,20 +45,17 @@ type HashRequest struct {
 	Object string
 	Extra  []string
 
-	// A indicates whether this request is asking for A records.
-	A bool
-
-	// AAAA indicates whether this request is asking for AAAA records.
-	AAAA bool
+	Type uint16
 }
 
 // Handler is the main DNS handler for hashy.
 //
 // This type does not implement dns.Handler. ServeDNS takes a logger that is enriched by Middleware.
 type Handler struct {
-	Domain  string
-	Locator *service.Locator
-	TTL     uint32
+	zoneDomain   string
+	groupsDomain string
+	locator      *service.Locator
+	ttl          uint32
 }
 
 // parseRequest validates and parses a request dns.Message into a HashRequest.
@@ -75,9 +75,9 @@ func (h *Handler) parseRequest(request *dns.Msg) (hr HashRequest, err error) {
 	// the question domain must have exactly (1) more label, which is the hash request string,
 	// and have the subdomain.
 	requestDomain := question.Header().Name
-	parentLabels := dnsutil.Labels(h.Domain)
+	parentLabels := dnsutil.Labels(h.zoneDomain)
 	requestLabels := dnsutil.Labels(requestDomain)
-	if dnsutil.Common(h.Domain, requestDomain) != parentLabels {
+	if dnsutil.Common(h.zoneDomain, requestDomain) != parentLabels {
 		// the requestDomain is not a proper subdomain of what this handler serves
 		err = errDomain
 		return
@@ -109,40 +109,27 @@ func (h *Handler) parseRequest(request *dns.Msg) (hr HashRequest, err error) {
 		}
 	}
 
-	switch question.Data().(type) {
-	case rdata.A:
-		hr.A = true
-
-	case rdata.AAAA:
-		hr.AAAA = true
-	}
-
 	// NOTE: an empty Name will cause response.Pack() to panic
 	hr.Name = requestDomain
-
+	hr.Type = dns.RRToType(question)
 	return
 }
 
 // handleRequest handles a valid HashRequest.
-func (h *Handler) handleRequest(_ context.Context, logger *zap.Logger, response *dns.Msg, request HashRequest) {
-	logger.Debug("handleRequest", zap.Any("request", request))
+func (h *Handler) handleRequest(_ context.Context, response *dns.Msg, request HashRequest) {
 	response.Rcode = dns.RcodeSuccess
+	endpoints := h.locator.FindString(request.Object)
+	response.Answer = slices.Grow(response.Answer, endpoints.LenRRs(request.Type))
 
-	for _, endpoint := range h.Locator.FindString(request.Object) {
-		if request.A {
-			for addr := range endpoint.A() {
-				response.Answer = append(response.Answer, &dns.A{
-					Hdr: dns.Header{
-						Name:  request.Name,
-						TTL:   h.TTL, // TODO: jitter?
-						Class: dns.ClassINET,
-					},
-					A: rdata.A{
-						Addr: addr,
-					},
-				})
-			}
-		}
+	header := dns.Header{
+		Name:  request.Name,
+		TTL:   h.ttl, // TODO: jitter?
+		Class: dns.ClassINET,
+	}
+
+	for _, rr := range endpoints.RRs(request.Type) {
+		*rr.Header() = header
+		response.Answer = append(response.Answer, rr)
 	}
 }
 
@@ -164,7 +151,7 @@ func (h *Handler) ServeDNS(ctx context.Context, logger *zap.Logger, writer dns.R
 		return
 	}
 
-	h.handleRequest(ctx, logger, response, hashRequest)
+	h.handleRequest(ctx, response, hashRequest)
 	if err := response.Pack(); err != nil {
 		logger.Error("unable to pack response", zap.Error(err))
 		return
