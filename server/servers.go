@@ -8,6 +8,18 @@ import (
 	"go.uber.org/zap"
 )
 
+// NewServerLogger produces a sublogger appropriate for server-specific messages.
+func NewServerLogger(parent *zap.Logger, serverName string, server *dns.Server) *zap.Logger {
+	return parent.With(
+		zap.Dict(
+			"server",
+			zap.String("name", serverName),
+			zap.String("addr", server.Addr),
+			zap.String("net", server.Net),
+		),
+	)
+}
+
 // NewUDPServer creates a *dns.Server from configuration.
 func NewUDPServer(cfg config.UDP) (s *dns.Server, err error) {
 	s = dns.NewServer()
@@ -78,39 +90,6 @@ func NewTCPServer(cfg config.TCP) (s *dns.Server, err error) {
 
 	s.ReusePort = cfg.ReusePort
 	s.ReuseAddr = cfg.ReusePort
-
-	return
-}
-
-// NewDNSServers creates all the DNS servers listed in the configuration, creates handlers for each one,
-// and binds each server to the enclosing fx.App lifecycle.
-func NewDNSServers(middleware *Middleware, lifecycler *Lifecycler, cfg config.DNS) (dnsServers []*dns.Server, err error) {
-	dnsServers = make([]*dns.Server, 0, len(cfg.UDP)+len(cfg.TCP))
-	for name, udpConfig := range cfg.UDP {
-		var server *dns.Server
-		server, err = NewUDPServer(udpConfig)
-		if err != nil {
-			return
-		}
-
-		var serverLogger *zap.Logger
-		server.Handler, serverLogger = middleware.Then(name)
-		lifecycler.Append(serverLogger, server)
-		dnsServers = append(dnsServers, server)
-	}
-
-	for name, tcpConfig := range cfg.TCP {
-		var server *dns.Server
-		server, err = NewTCPServer(tcpConfig)
-		if err != nil {
-			return
-		}
-
-		var serverLogger *zap.Logger
-		server.Handler, serverLogger = middleware.Then(name)
-		lifecycler.Append(serverLogger, server)
-		dnsServers = append(dnsServers, server)
-	}
 
 	return
 }

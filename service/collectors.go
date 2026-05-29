@@ -3,6 +3,7 @@ package service
 import (
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 
 	"codeberg.org/miekg/dns"
@@ -30,7 +31,10 @@ func (gc *groupCollector) add(gdef GroupDefinition) {
 		return
 	}
 
-	(*gc)[gdef.Name] = MergeGroupDefinitions((*gc)[gdef.Name], gdef)
+	merged := (*gc)[gdef.Name]
+	merged.Name = gdef.Name
+	merged.Services = append(merged.Services, gdef.Services...)
+	(*gc)[gdef.Name] = merged
 }
 
 // addTxt parses several group definitions and adds them to this collector.
@@ -60,7 +64,9 @@ func (gc groupCollector) sorted() (defs []GroupDefinition) {
 	for _, def := range gc {
 		dedupeServices.Clear()
 		dedupeServices.Add(def.Services...)
-		def.Services = dedupeServices.SortFunc(strings.Compare)
+		def.Services = dedupeServices.AppendTo(def.Services[:0]) // reuse def.Services storage
+		sort.Strings(def.Services)
+
 		defs = append(defs, def)
 	}
 
@@ -195,9 +201,6 @@ type RRCollector struct {
 	// discoveryDomain is the DNS name that TXT records containing group information belong to
 	discoveryDomain string
 
-	// nameGenerator is used to generate synthetic names for all the endpoints
-	nameGenerator EndpointNameGenerator
-
 	// groups is group->service
 	groups groupCollector
 
@@ -249,7 +252,6 @@ func (rrc *RRCollector) Build() *Groups {
 		)
 	}
 
-	rrc.nameGenerator.GenerateAll(gps.All())
 	rrc.Reset()
 	return gps
 }

@@ -20,20 +20,13 @@ import (
 func Provide() fx.Option {
 	return fx.Options(
 		fx.Provide(
-			func(gcfg config.Groups, zcfg config.Zone) EndpointNameGenerator {
-				return EndpointNameGenerator{
-					Prefix: gcfg.GeneratedNamePrefix,
-					Domain: zcfg.Domain,
-				}
-			},
-			func(base *zap.Logger, eng EndpointNameGenerator, gcfg config.Groups) *FileIngester {
+			func(base *zap.Logger, gcfg config.Groups) *FileIngester {
 				return &FileIngester{
 					Logger:          base.Named("fileIngester"),
 					ZoneFiles:       gcfg.ZoneFiles,
 					Origin:          gcfg.Origin,
 					DefaultTTL:      hashy.DurationToSeconds(gcfg.DefaultTTL),
 					DiscoveryDomain: gcfg.DiscoveryDomain,
-					NameGenerator:   eng,
 				}
 			},
 			func(base *zap.Logger, fi *FileIngester, gcfg config.Groups) *Locator {

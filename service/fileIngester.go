@@ -28,7 +28,6 @@ type FileIngester struct {
 	Origin          string
 	DefaultTTL      uint32
 	DiscoveryDomain string
-	NameGenerator   EndpointNameGenerator
 
 	lock      sync.RWMutex
 	listeners []IngestListener
@@ -91,7 +90,6 @@ func (fi *FileIngester) dispatchIngestEvent(event IngestEvent) {
 func (fi *FileIngester) newRRCollector() (rrc RRCollector) {
 	rrc = RRCollector{
 		discoveryDomain: fi.DiscoveryDomain,
-		nameGenerator:   fi.NameGenerator,
 	}
 
 	if len(rrc.discoveryDomain) == 0 {

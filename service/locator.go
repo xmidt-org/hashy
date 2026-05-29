@@ -33,8 +33,6 @@ func (le LocatedEndpoints) LenRRs(rrType uint16) (n int) {
 	return
 }
 
-func (le LocatedEndpoints) emptyRRs(func(*Endpoint, dns.RR) bool) {}
-
 // RRs returns a sequence of (*Endpoint, dns.RR) tuples. Each RR is of the
 // given type. Each RR's Class will be set to ClassINET, but will otherwise
 // be uninitialized.
@@ -81,7 +79,7 @@ func (le LocatedEndpoints) RRs(rrType uint16) iter.Seq2[*Endpoint, dns.RR] {
 		}
 
 	default:
-		return le.emptyRRs
+		return emptyRRs[*Endpoint]
 	}
 }
 
@@ -120,6 +118,14 @@ func (l *Locator) FindString(object string) LocatedEndpoints {
 	return results
 }
 
+func (l *Locator) Groups() (gps *Groups) {
+	l.lock.RLock()
+	gps = l.groups
+	l.lock.RUnlock()
+
+	return
+}
+
 func (l *Locator) OnIngest(event IngestEvent) {
 	l.logger.Debug("received ingest event", zap.Any("event", event))
 
@@ -133,13 +139,15 @@ func (l *Locator) OnIngest(event IngestEvent) {
 func (l *Locator) Update(gps *Groups) {
 	if l.logger.Level().Enabled(zapcore.DebugLevel) {
 		for g := range gps.All() {
+			l.logger.Debug("group",
+				zap.String("name", g.Name()),
+				zap.Strings("services", g.services),
+			)
+
 			for e := range g.Endpoints() {
 				l.logger.Debug("endpoint",
 					zap.String("group", g.Name()),
-					zap.Dict("endpoint",
-						zap.String("name", e.Name()),
-						zap.String("originalName", e.OriginalName()),
-					),
+					zap.String("originalName", e.OriginalName()),
 				)
 			}
 		}
@@ -153,7 +161,7 @@ func (l *Locator) Update(gps *Groups) {
 			group.Len(),
 			medley.Objectify(
 				func(s *Endpoint) string {
-					return s.Name()
+					return s.OriginalName()
 				},
 				group.Endpoints(),
 			),
