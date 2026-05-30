@@ -101,7 +101,7 @@ type Locator struct {
 // If no groups are passed, all rings are returned. If any groups are missing,
 // no ring is pushed for that group name.
 //
-// No concurrency protection is provided by this method.  Callers must content on the lock.
+// No concurrency protection is provided by this method.  Callers must contend on the lock.
 func (l *Locator) rings(groups []string) iter.Seq[*consistent.Ring[*Endpoint]] {
 	return func(yield func(*consistent.Ring[*Endpoint]) bool) {
 		if len(groups) > 0 {
