@@ -5,18 +5,20 @@ package service
 
 import (
 	"context"
+	"hash/adler32"
 	"io"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 	"github.com/xmidt-org/hashy"
 	"github.com/xmidt-org/hashy/config"
+	"github.com/xmidt-org/medley"
 	"go.uber.org/zap"
 )
 
@@ -124,7 +126,10 @@ type FileIngester struct {
 	ttl             uint32
 	discoveryDomain string
 
-	lock      sync.RWMutex
+	checksummer medley.Constructor[uint32]
+	first       atomic.Bool
+	checksum    atomic.Uint32
+
 	listeners []IngestListener
 }
 
@@ -155,23 +160,11 @@ func NewFileIngester(opts ...FileIngesterOption) (*FileIngester, error) {
 			applyToFileIngester(fi)
 	}
 
+	if fi.checksummer == nil {
+		fi.checksummer = medley.AsConstructor32(adler32.New)
+	}
+
 	return fi, nil
-}
-
-func (fi *FileIngester) AddIngestListeners(more ...IngestListener) {
-	fi.lock.Lock()
-	fi.listeners = slices.Grow(fi.listeners, len(more))
-	fi.listeners = append(fi.listeners, more...)
-	fi.lock.Unlock()
-}
-
-func (fi *FileIngester) RemoveIngestListeners(less ...IngestListener) {
-	fi.lock.Lock()
-	defer fi.lock.Unlock()
-
-	fi.listeners = slices.DeleteFunc(fi.listeners, func(candidate IngestListener) bool {
-		return slices.Contains(less, candidate)
-	})
 }
 
 // zoneParsers is a sequence of file paths for each configured glob. If any error occurs,
@@ -198,12 +191,7 @@ func (fi *FileIngester) zoneFiles(yield func(string, error) bool) {
 
 // newZoneParser creates a *ZoneParser for a path. If the context has expired, or if a problem
 // occurs opening the path, and error is returned and the other returned values will be nil.
-func (fi *FileIngester) newZoneParser(ctx context.Context, path string) (parser *dns.ZoneParser, closer io.Closer, err error) {
-	if ctx.Err() != nil {
-		err = ctx.Err()
-		return
-	}
-
+func (fi *FileIngester) newZoneParser(checksummer medley.Hash[uint32], path string) (parser *dns.ZoneParser, closer io.Closer, err error) {
 	var file *os.File
 	file, err = os.Open(path)
 	if err != nil {
@@ -211,14 +199,15 @@ func (fi *FileIngester) newZoneParser(ctx context.Context, path string) (parser 
 	}
 
 	closer = file
-	parser = dns.NewZoneParser(file, fi.origin, path)
+	reader := io.TeeReader(file, checksummer)
+	parser = dns.NewZoneParser(reader, fi.origin, path)
 	parser.IncludeFS = os.DirFS(filepath.Dir(path)) // includes are relative to the location of the file
 	parser.SetDefaultTTL(fi.ttl)
 	return
 }
 
-func (fi *FileIngester) ingestFile(ctx context.Context, l *zap.Logger, rrc *RRCollector, path string) error {
-	parser, closer, err := fi.newZoneParser(ctx, path)
+func (fi *FileIngester) ingestFile(l *zap.Logger, checksummer medley.Hash[uint32], rrc *RRCollector, path string) error {
+	parser, closer, err := fi.newZoneParser(checksummer, path)
 	if err != nil {
 		return err
 	}
@@ -241,20 +230,25 @@ func (fi *FileIngester) ingestFile(ctx context.Context, l *zap.Logger, rrc *RRCo
 }
 
 func (fi *FileIngester) dispatchIngestEvent(event IngestEvent) {
-	fi.lock.RLock()
-	defer fi.lock.RUnlock()
 	for _, l := range fi.listeners {
 		l.OnIngest(event)
 	}
 }
 
+// Ingest reads in all the files this FileIngester was configured with.
+// This method tracks the checksum across all files. An IngestEvent will
+// only be dispatch if either (a) this is the first Ingest, or (b) if any
+// change in the files occurred.
 func (fi *FileIngester) Ingest(ctx context.Context) {
 	var event IngestEvent
 	rrc := RRCollector{
 		discoveryDomain: fi.discoveryDomain,
 	}
 
+	oldChecksum := fi.checksum.Load()
+	checksummer := fi.checksummer()
 	fileCount := 0
+
 	for path, err := range fi.zoneFiles {
 		if err != nil {
 			event.Err = err
@@ -262,16 +256,15 @@ func (fi *FileIngester) Ingest(ctx context.Context) {
 			break
 		}
 
+		event.Err = ctx.Err()
+		if event.Err != nil {
+			break
+		}
+
 		fileCount++
 		ingestLogger := fi.logger.With(zap.String("path", path))
 		ingestLogger.Debug("parsing zone file")
-
-		event.Err = fi.ingestFile(
-			ctx,
-			ingestLogger,
-			&rrc,
-			path,
-		)
+		event.Err = fi.ingestFile(ingestLogger, checksummer, &rrc, path)
 
 		if event.Err != nil {
 			fi.logger.Error("error parsing file", zap.String("path", path), zap.Error(err))
@@ -281,8 +274,26 @@ func (fi *FileIngester) Ingest(ctx context.Context) {
 
 	fi.logger.Info("parsing complete", zap.Int("fileCount", fileCount))
 	if event.Err == nil {
-		event.Groups = rrc.Build()
-	}
+		newChecksum := checksummer.Value()
 
-	fi.dispatchIngestEvent(event)
+		if fi.first.CompareAndSwap(false, true) {
+			// on the first time we ingest, we always build groups and dispatch
+			fi.logger.Info("initial ingest")
+			event.Groups = rrc.Build()
+			fi.checksum.Store(newChecksum)
+		} else if fi.checksum.Load() != newChecksum && fi.checksum.CompareAndSwap(oldChecksum, newChecksum) {
+			// only build groups if there was a change that we recognize
+			fi.logger.Info("changes detected")
+			event.Groups = rrc.Build()
+		}
+
+		if event.Groups != nil {
+			fi.dispatchIngestEvent(event)
+		} else {
+			fi.logger.Info("no changes since last ingest")
+		}
+	} else {
+		// always dispatch errors
+		fi.dispatchIngestEvent(event)
+	}
 }

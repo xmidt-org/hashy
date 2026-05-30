@@ -12,12 +12,6 @@ import (
 )
 
 // Provide creates the relevant components in this package.
-//
-// The following components must be supplied:
-//
-//   - *zap.Logger
-//   - config.Groups
-//   - config.Zone
 func Provide() fx.Option {
 	return fx.Options(
 		fx.Provide(
@@ -46,11 +40,29 @@ func Provide() fx.Option {
 				},
 				fx.ParamTags("", "", `group:"ingestListeners"`),
 			),
+			func(gcfg config.Groups, fi *FileIngester, lc fx.Lifecycle) (ic *IngestChecker, err error) {
+				ic, err = NewIngestChecker(
+					WithIngester(fi),
+					WithCheckInterval(gcfg.CheckInterval),
+				)
+
+				if err != nil {
+					return
+				}
+
+				lc.Append(fx.StartStopHook(
+					ic.Start,
+					ic.Stop,
+				))
+
+				return
+			},
 		),
 		fx.Invoke(
 			func(fi *FileIngester) {
 				fi.Ingest(context.Background())
 			},
+			func(*IngestChecker) {},
 		),
 	)
 }

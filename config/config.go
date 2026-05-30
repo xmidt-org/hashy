@@ -77,6 +77,10 @@ type Groups struct {
 	// VNodes is the number of virtual nodes to use in consistent hashing.
 	VNodes int `json:"vnodes" yaml:"vnodes" mapstructure:"vnodes"`
 
+	// CheckInterval is the interval on which external sources of DNS RRs are rechecked
+	// to see if hashy may update its state. If unset, a service.DefaultCheckInterval is used.
+	CheckInterval time.Duration `json:"checkInterval" yaml:"checkInterval" mapstructure:"checkInterval"`
+
 	// ZoneFiles is a list of filesystem globs that contain group information.
 	ZoneFiles []string `json:"zoneFiles" yaml:"zoneFiles" mapstructure:"zoneFiles"`
 

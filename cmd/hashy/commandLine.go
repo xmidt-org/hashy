@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"slices"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/spf13/viper"
@@ -21,10 +22,11 @@ import (
 
 // CommandLine represents the hashy command line.
 type CommandLine struct {
-	Verbose   bool     `help:"turns on verbose logging, which includes the fx.App startup logs"`
-	Debug     *bool    `help:"turns on debugging, overriding configuration"`
-	ConfFile  string   `name:"conf-file" help:"configuration file to read. If unset, /etc/hashy, $HOME/.hashy, and the current directory will be searched for hashy.yaml"`
-	ZoneFiles []string `name:"zone-files" help:"additional globs for zone files. Will be appended to configuration. Relative paths are resolved relative to the conf file."`
+	Verbose       bool          `help:"turns on verbose logging, which includes the fx.App startup logs"`
+	Debug         *bool         `help:"turns on debugging, overriding configuration"`
+	ConfFile      string        `name:"conf-file" help:"configuration file to read. If unset, /etc/hashy, $HOME/.hashy, and the current directory will be searched for hashy.yaml"`
+	ZoneFiles     []string      `name:"zone-files" help:"additional globs for zone files. Will be appended to configuration. Relative paths are resolved relative to the conf file."`
+	CheckInterval time.Duration `name:"check-interval" help:"the interval on which hashy reingests DNS RRs from its external sources. Overrides configuration."`
 }
 
 func (cl *CommandLine) newViper() (v *viper.Viper, err error) {
@@ -58,6 +60,10 @@ func (cl *CommandLine) newViper() (v *viper.Viper, err error) {
 func (cl *CommandLine) decorateGroups(l *zap.Logger, gcfg config.Groups) config.Groups {
 	gcfg.ZoneFiles = slices.Grow(gcfg.ZoneFiles, len(cl.ZoneFiles))
 	gcfg.ZoneFiles = append(gcfg.ZoneFiles, cl.ZoneFiles...)
+
+	if cl.CheckInterval > 0 {
+		gcfg.CheckInterval = cl.CheckInterval
+	}
 
 	return gcfg
 }
