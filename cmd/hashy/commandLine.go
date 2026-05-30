@@ -6,7 +6,6 @@ package main
 import (
 	"bytes"
 	"errors"
-	"os"
 	"slices"
 
 	"github.com/alecthomas/kong"
@@ -59,10 +58,6 @@ func (cl *CommandLine) newViper() (v *viper.Viper, err error) {
 func (cl *CommandLine) decorateGroups(l *zap.Logger, gcfg config.Groups) config.Groups {
 	gcfg.ZoneFiles = slices.Grow(gcfg.ZoneFiles, len(cl.ZoneFiles))
 	gcfg.ZoneFiles = append(gcfg.ZoneFiles, cl.ZoneFiles...)
-
-	for i, glob := range gcfg.ZoneFiles {
-		gcfg.ZoneFiles[i] = os.ExpandEnv(glob)
-	}
 
 	return gcfg
 }

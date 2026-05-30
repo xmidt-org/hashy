@@ -74,10 +74,6 @@ type Groups struct {
 	// DefaultDiscoveryDomain.
 	DiscoveryDomain string `json:"discoveryDomain" yaml:"discoveryDomain" mapstructure:"discoveryDomain"`
 
-	// GeneratedNamePrefix is the prefix used when synthesizing host names for discovered servers.
-	// The default is DefaultGeneratedNamePrefix.
-	GeneratedNamePrefix string `json:"generatedNamePrefix" yaml:"generatedNamePrefix" mapstructure:"generatedNamePrefix"`
-
 	// VNodes is the number of virtual nodes to use in consistent hashing.
 	VNodes int `json:"vnodes" yaml:"vnodes" mapstructure:"vnodes"`
 

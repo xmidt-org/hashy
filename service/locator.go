@@ -86,15 +86,56 @@ func (le LocatedEndpoints) RRs(rrType uint16) iter.Seq2[*Endpoint, dns.RR] {
 	}
 }
 
+type LocatorOption interface {
+	applyToLocator(*Locator) error
+}
+
+type locatorOptionFunc func(*Locator) error
+
+func (f locatorOptionFunc) applyToLocator(l *Locator) error { return f(l) }
+
+func WithLocatorLogger(base *zap.Logger) LocatorOption {
+	return locatorOptionFunc(func(l *Locator) error {
+		if base == nil {
+			base = zap.NewNop()
+		}
+
+		l.logger = base.Named("locator")
+		return nil
+	})
+}
+
+func WithVNodes(vnodes int) LocatorOption {
+	return locatorOptionFunc(func(l *Locator) error {
+		l.builder.VNodes(vnodes)
+		return nil
+	})
+}
+
 // Locator is a service locator backed by one or more medley consistent hash Rings.
 type Locator struct {
 	logger  *zap.Logger
-	builder *consistent.Builder[string, *Endpoint]
+	builder consistent.Builder[string, *Endpoint]
 
 	lock        sync.RWMutex
 	groups      *Groups
 	ringsByName map[string]*consistent.Ring[*Endpoint]
 	allRings    []*consistent.Ring[*Endpoint]
+}
+
+func NewLocator(opts ...LocatorOption) (*Locator, error) {
+	loc := new(Locator)
+	for _, o := range opts {
+		if err := o.applyToLocator(loc); err != nil {
+			return nil, err
+		}
+	}
+
+	if loc.logger == nil {
+		loc.logger = zap.NewNop()
+	}
+
+	return loc, nil
 }
 
 // rings produces a sequence of rings, optionally filtered by group.
