@@ -19,6 +19,12 @@ type Zone struct {
 
 	// TTL is the base time-to-live of records generated in this zone.
 	TTL time.Duration `json:"ttl" yaml:"ttl" mapstructure:"ttl"`
+
+	// TTLJitter is the percentage of variance for the TTL. Each DNS request has the TTL
+	// varied by this value. The default is 0, meaning no jitter.
+	//
+	// If this value is outside the range 0.0 <= TTLJitter < 1.0, an error is raised.
+	TTLJitter float64 `json:"ttlJitter" yaml:"ttlJitter" mapstructure:"ttlJitter"`
 }
 
 // UDP is the configuration for a single UDP server that serve DNS traffic.
