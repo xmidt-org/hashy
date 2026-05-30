@@ -91,31 +91,56 @@ type Locator struct {
 	lock        sync.RWMutex
 	groups      *Groups
 	ringsByName map[string]*consistent.Ring[*Endpoint]
-	rings       []*consistent.Ring[*Endpoint]
+	allRings    []*consistent.Ring[*Endpoint]
 }
 
-func (l *Locator) Find(object []byte) LocatedEndpoints {
+// rings produces a sequence of rings, optionally filtered by group.
+// If no groups are passed, all rings are returned. If any groups are missing,
+// no ring is pushed for that group name.
+//
+// No concurrency protection is provided by this method.  Callers must content on the lock.
+func (l *Locator) rings(groups []string) iter.Seq[*consistent.Ring[*Endpoint]] {
+	return func(yield func(*consistent.Ring[*Endpoint]) bool) {
+		if len(groups) > 0 {
+			for _, groupName := range groups {
+				if ring := l.ringsByName[groupName]; ring != nil {
+					if !yield(ring) {
+						return
+					}
+				}
+			}
+		} else {
+			for _, ring := range l.allRings {
+				if !yield(ring) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func (l *Locator) Find(object []byte, groups ...string) (results LocatedEndpoints) {
 	defer l.lock.RUnlock()
 	l.lock.RLock()
 
-	results := make(LocatedEndpoints, len(l.rings))
-	for i, ring := range l.rings {
-		results[i] = ring.Nearest(object)
+	results = make(LocatedEndpoints, 0, len(l.allRings)) // worst case
+	for ring := range l.rings(groups) {
+		results = append(results, ring.Nearest(object))
 	}
 
-	return results
+	return
 }
 
-func (l *Locator) FindString(object string) LocatedEndpoints {
+func (l *Locator) FindString(object string, groups ...string) (results LocatedEndpoints) {
 	defer l.lock.RUnlock()
 	l.lock.RLock()
 
-	results := make(LocatedEndpoints, len(l.rings))
-	for i, ring := range l.rings {
-		results[i] = ring.NearestString(object)
+	results = make(LocatedEndpoints, 0, len(l.allRings)) // worst case
+	for ring := range l.rings(groups) {
+		results = append(results, ring.NearestString(object))
 	}
 
-	return results
+	return
 }
 
 func (l *Locator) Groups() (gps *Groups) {
@@ -174,6 +199,6 @@ func (l *Locator) Update(gps *Groups) {
 	l.lock.Lock()
 	l.groups = gps
 	l.ringsByName = ringsByName
-	l.rings = rings
+	l.allRings = rings
 	l.lock.Unlock()
 }

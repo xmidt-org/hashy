@@ -35,7 +35,8 @@ const (
 
 // groupRequest holds the information from a DNS question for responding with located endpoints.
 type endpointRequest struct {
-	name string
+	name   string
+	groups []string
 
 	prefix string
 	object string
@@ -196,6 +197,10 @@ func (h *Handler) parseEndpointRequest(question dns.RR) endpointRequest {
 		parts = strings.Split(labels[0], "-")
 	)
 
+	// the labels between the hash object and the zone domain are
+	// taken to be group names used as filters
+	request.groups = labels[1:]
+
 	if len(parts) > 1 {
 		request.prefix = parts[0]
 		request.object = parts[1]
@@ -208,7 +213,7 @@ func (h *Handler) parseEndpointRequest(question dns.RR) endpointRequest {
 }
 
 func (h *Handler) serveEndpoint(response *dns.Msg, request endpointRequest) {
-	endpoints := h.locator.FindString(request.object)
+	endpoints := h.locator.FindString(request.object, request.groups...)
 	response.Answer = slices.Grow(response.Answer, endpoints.LenRRs(request.rrType))
 
 	header := dns.Header{
