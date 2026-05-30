@@ -15,6 +15,7 @@ dns:
       readTimeout: 10s
       idleTimeout: 60s
       size: 512
+  
   tcp:
     "tcp-default":
       address: ":7373"
