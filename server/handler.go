@@ -332,7 +332,7 @@ func (h *Handler) ServeDNS(ctx context.Context, writer dns.ResponseWriter, reque
 	start := time.Now()
 	logger := h.logger.With(
 		zap.Stringer("localAddress", writer.LocalAddr()),
-		zap.Uint16("id", request.MsgHeader.ID),
+		zap.Uint16("id", request.ID),
 		// NOTE: the request isn't unpacked yet, so we can't see the questions
 	)
 

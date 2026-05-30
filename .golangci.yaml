@@ -21,6 +21,9 @@ linters:
       errorf: false
     misspell:
       locale: US
+    gosec:
+      excludes:
+        - G404 # weak random number generator, which constantly produces false positives
   exclusions:
     generated: lax
     presets:
