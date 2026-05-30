@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # This is the yaml file loaded when no config file could be found.
-
+---
 dns:
   zone:
     domain: hashy.net
@@ -15,7 +15,7 @@ dns:
       readTimeout: 10s
       idleTimeout: 60s
       size: 512
-  
+
   tcp:
     "tcp-default":
       address: ":7373"
@@ -31,4 +31,3 @@ logging:
   development: true
   level: DEBUG
   encoding: console
-
