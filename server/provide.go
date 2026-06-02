@@ -29,15 +29,27 @@ func Provide() fx.Option {
 
 				return
 			},
-			// create the base handler that will be cloned for each server
-			func(zcfg config.Zone, j *hashy.TTLJitterer, loc *service.Locator) (*Handler, error) {
-				return NewHandler(
-					WithZoneDomain(zcfg.Domain),
-					WithJitterer(j),
-					WithLocator(loc),
+			func(locator *service.Locator, jitterer *hashy.TTLJitterer) (*EndpointHandler, error) {
+				return NewEndpointHandler(
+					WithEndpointLocator(locator),
+					WithEndpointJitterer(jitterer),
 				)
 			},
-
+			func(locator *service.Locator, jitterer *hashy.TTLJitterer) (*GroupHandler, error) {
+				return NewGroupHandler(
+					WithGroupLocator(locator),
+					WithGroupJitterer(jitterer),
+				)
+			},
+			// create the base handler that will be cloned for each server
+			func(zcfg config.Zone, base *zap.Logger, eh *EndpointHandler, gh *GroupHandler) (*Handler, error) {
+				return NewHandler(
+					WithZoneDomain(zcfg.Domain),
+					WithLogger(base),
+					WithEndpointHandler(eh),
+					WithGroupHandler(gh),
+				)
+			},
 			// create the server Bundle and bind it to the fx.App lifecycle
 			func(dcfg config.DNS, parent *zap.Logger, base *Handler, lc fx.Lifecycle, sh fx.Shutdowner) (b Bundle, err error) {
 				b, err = NewBundle(dcfg, parent)

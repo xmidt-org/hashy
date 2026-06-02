@@ -5,19 +5,13 @@ package server
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
-	"iter"
-	"math/rand/v2"
-	"slices"
-	"strings"
 	"time"
 
 	"codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
-	"github.com/xmidt-org/hashy"
 	"github.com/xmidt-org/hashy/hashyzap"
-	"github.com/xmidt-org/hashy/service"
 	"go.uber.org/zap"
 )
 
@@ -36,26 +30,6 @@ const (
 	DefaultZoneTTL time.Duration = 5 * time.Minute
 )
 
-// groupRequest holds the information from a DNS question for responding with located endpoints.
-type endpointRequest struct {
-	name   string
-	groups []string
-
-	prefix string
-	object string
-	extra  []string
-
-	rrType uint16
-}
-
-// groupRequest holds the information from a DNS question for responding with group metadata.
-type groupRequest struct {
-	name string
-
-	group  string
-	rrType uint16
-}
-
 type HandlerOption interface {
 	applyToHandler(*Handler) error
 }
@@ -71,52 +45,121 @@ func WithLogger(base *zap.Logger) HandlerOption {
 	})
 }
 
-func WithZoneDomain(zoneDomain string) HandlerOption {
+func WithZoneDomain(d string) HandlerOption {
 	return handlerOptionFunc(func(h *Handler) error {
-		if len(zoneDomain) > 0 {
-			h.zoneDomain = dnsutil.Fqdn(zoneDomain)
-			h.endpointDomain = dnsutil.Join(EndpointLabel, h.zoneDomain)
-			h.groupDomain = dnsutil.Join(GroupLabel, h.zoneDomain)
+		h.zoneDomain = dnsutil.Fqdn(d)
+		return nil
+	})
+}
+
+func WithEndpointHandler(eh *EndpointHandler) HandlerOption {
+	return handlerOptionFunc(func(h *Handler) error {
+		h.endpointHandler = eh
+		return nil
+	})
+}
+
+func WithGroupHandler(gh *GroupHandler) HandlerOption {
+	return handlerOptionFunc(func(h *Handler) error {
+		h.groupHandler = gh
+		return nil
+	})
+}
+
+// operation holds all the extracted state necessary for a single Handler request.
+type operation struct {
+	ctx    context.Context
+	writer dns.ResponseWriter
+
+	original *dns.Msg
+	start    time.Time
+
+	logger   *zap.Logger
+	response *dns.Msg
+}
+
+// startOperation initializes a new operation from a DNS request.
+func startOperation(ctx context.Context, base *zap.Logger, writer dns.ResponseWriter, original *dns.Msg) (op operation) {
+	op.ctx = ctx
+	op.writer = writer
+	op.original = original
+	op.start = time.Now()
+
+	op.response = op.original.Copy()
+	op.response.Rcode = dns.RcodeSuccess // default
+
+	op.logger = base.With(
+		hashyzap.Request("request", op.original),
+	)
+
+	dnsutil.SetReply(op.response, op.original)
+	op.logger.Info("request start")
+	return
+}
+
+// getQuestion attempts to extract the question from the operation's request.
+// If this method returns nil, the operation should be abandoned.
+func (op *operation) getQuestion() (question dns.RR) {
+	switch {
+	case len(op.original.Question) != 1:
+		op.response.Rcode = dns.RcodeRefused
+		op.logger.Error("invalid number of questions")
+
+	case op.original.Question[0].Header().Class != dns.ClassINET:
+		op.response.Rcode = dns.RcodeRefused
+		op.logger.Error("unhandled class")
+
+	default:
+		question = op.original.Question[0]
+	}
+
+	return
+}
+
+// unhandled reports this operation as unhandled and indicates this in the response.
+func (op *operation) unhandled() {
+	op.logger.Error("unhandled request")
+	op.response.Rcode = dns.RcodeRefused
+}
+
+// finish performs all the necessary completion tasks for an operation.
+func (op *operation) finish() {
+	var err error
+	if err = op.response.Pack(); err != nil {
+		op.logger.Error("unable to pack response", zap.Error(err))
+	}
+
+	if err == nil {
+		if _, err = io.Copy(op.writer, op.response); err != nil {
+			op.logger.Error("unable to write response", zap.Error(err))
 		}
+	}
 
-		return nil
-	})
-}
-
-func WithLocator(l *service.Locator) HandlerOption {
-	return handlerOptionFunc(func(h *Handler) error {
-		h.locator = l
-		return nil
-	})
-}
-
-func WithJitterer(j *hashy.TTLJitterer) HandlerOption {
-	return handlerOptionFunc(func(h *Handler) (err error) {
-		h.jitterer = j
-		return
-	})
+	op.logger.Info("request complete", zap.Duration("duration", time.Since(op.start)))
 }
 
 // Handler is the main DNS handler for hashy. Most of hashy's logic is contained
 // in this type.
+//
+// A Handler routes to some internal handlers based on domain.
 type Handler struct {
 	// logger is the logger for this Handler, typically enhanced with server information.
 	logger *zap.Logger
 
-	// zoneDomain is the domain that hashy serves.
+	// zoneDomain is the domain this Handler serves.
 	zoneDomain string
 
-	// endpointDomain is the subdomain that serves endpoint hashes.
+	// endpointDomain is the subdomain the endpoint handler serves.
 	endpointDomain string
 
-	// groupDomain is the subdomain of zoneDomain that hashy responds to with group metadata.
+	// endpointHandler is the dns.Handler that serves hashed responses.
+	endpointHandler *EndpointHandler
+
+	// groupDomain is the subdomain the group handler serves.
 	groupDomain string
 
-	// locator is the required service locator for this handler.
-	locator *service.Locator
-
-	// jitterer is used to provide jitter for the TTL of any DNS RRs produced by this handler.
-	jitterer *hashy.TTLJitterer
+	// groupHandler is the dns.Handler servers metadata about groups.
+	groupHandler *GroupHandler
 }
 
 // NewHandler creates a Handler from a set of options.
@@ -128,21 +171,24 @@ func NewHandler(opts ...HandlerOption) (*Handler, error) {
 		}
 	}
 
-	if h.locator == nil {
-		return nil, fmt.Errorf("a locator is required for a Handler")
+	if h.endpointHandler == nil {
+		return nil, errors.New("an endpoint handler is required")
+	}
+
+	if h.groupHandler == nil {
+		return nil, errors.New("a group handler is required")
 	}
 
 	if h.logger == nil {
-		h.logger = zap.NewNop()
+		return nil, errors.New("a base logger is required")
 	}
 
 	if len(h.zoneDomain) == 0 {
-		WithZoneDomain(DefaultZoneDomain).applyToHandler(h)
+		h.zoneDomain = DefaultZoneDomain
 	}
 
-	if h.jitterer == nil {
-		h.jitterer, _ = hashy.NewTTLJitterer(hashy.DurationToSeconds(DefaultZoneTTL), 0.0)
-	}
+	h.endpointDomain = dnsutil.Join(EndpointLabel, h.zoneDomain)
+	h.groupDomain = dnsutil.Join(GroupLabel, h.zoneDomain)
 
 	return h, nil
 }
@@ -162,157 +208,33 @@ func (h *Handler) Clone(logger *zap.Logger) *Handler {
 	return clone
 }
 
-func (h *Handler) writeResponse(logger *zap.Logger, writer dns.ResponseWriter, response *dns.Msg) {
-	if err := response.Pack(); err != nil {
-		logger.Error("unable to pack response", zap.Error(err))
-		return
-	}
-
-	if _, err := io.Copy(writer, response); err != nil {
-		logger.Error("unable to write response", zap.Error(err))
-	}
-}
-
-// parseEndpointRequest parses the question into a request object carrying the
-// information to satisfy and endpoint hash.
-func (h *Handler) parseEndpointRequest(question dns.RR) endpointRequest {
-	var (
-		request = endpointRequest{
-			name:   question.Header().Name,
-			rrType: dns.RRToType(question),
-		}
-
-		subdomain = dnsutil.Trim(request.name, h.endpointDomain)
-		labels    = strings.Split(subdomain, ".")
-
-		// use only the first (leftmost) label to extract the hash object
-		parts = strings.Split(labels[0], "-")
-	)
-
-	// the labels between the hash object and the zone domain are
-	// taken to be group names used as filters
-	request.groups = labels[1:]
-
-	if len(parts) > 1 {
-		request.prefix = parts[0]
-		request.object = parts[1]
-		request.extra = parts[2:]
-	} else {
-		request.object = parts[0]
-	}
-
-	return request
-}
-
-func (h *Handler) serveEndpoint(response *dns.Msg, request endpointRequest) {
-	endpoints := h.locator.FindString(request.object, request.groups...)
-	response.Answer = slices.Grow(response.Answer, endpoints.LenRRs(request.rrType))
-
-	header := dns.Header{
-		Name:  request.name,
-		TTL:   h.jitterer.TTL(),
-		Class: dns.ClassINET,
-	}
-
-	for _, rr := range endpoints.RRs(request.rrType) {
-		*rr.Header() = header
-		response.Answer = append(response.Answer, rr)
-	}
-
-	if len(response.Answer) > 1 {
-		rand.Shuffle(len(response.Answer), func(i, j int) {
-			response.Answer[i], response.Answer[j] =
-				response.Answer[j], response.Answer[i]
-		})
-	}
-}
-
-func (h *Handler) parseGroupRequest(question dns.RR) groupRequest {
-	var (
-		request = groupRequest{
-			name:   question.Header().Name,
-			rrType: dns.RRToType(question),
-		}
-
-		subdomain = dnsutil.Trim(request.name, h.groupDomain)
-		labels    = strings.Split(subdomain, ".")
-	)
-
-	request.group = labels[0]
-	return request
-}
-
-func (h *Handler) serveGroup(response *dns.Msg, request groupRequest) {
-	// we only communicate metadata via TXT records
-	if request.rrType != dns.TypeTXT {
-		response.Rcode = dns.RcodeRefused
-		return
-	}
-
-	gps := h.locator.Groups()
-	var rrs iter.Seq2[*service.Group, dns.RR]
-	if len(request.group) > 0 {
-		if g := gps.Get(request.group); g != nil {
-			// only records for this group
-			response.Answer = slices.Grow(response.Answer, g.LenRRs(request.rrType))
-			rrs = g.RRs(request.rrType)
-		}
-	} else {
-		// all records for all groups
-		response.Answer = slices.Grow(response.Answer, gps.LenRRs(request.rrType))
-		rrs = gps.RRs(request.rrType)
-	}
-
-	if rrs != nil {
-		header := dns.Header{
-			Name:  request.name,
-			TTL:   h.jitterer.TTL(),
-			Class: dns.ClassINET,
-		}
-
-		for _, rr := range rrs {
-			*rr.Header() = header
-			response.Answer = append(response.Answer, rr)
-		}
-	}
-}
-
 func (h *Handler) ServeDNS(ctx context.Context, writer dns.ResponseWriter, request *dns.Msg) {
-	var (
-		start  = time.Now()
-		logger = h.logger.With(
-			hashyzap.Request("request", request),
+	op := startOperation(ctx, h.logger, writer, request)
+	defer op.finish()
+
+	question := op.getQuestion()
+	if question == nil {
+		return
+	}
+
+	switch {
+	case dnsutil.IsBelow(h.endpointDomain, question.Header().Name):
+		h.endpointHandler.ServeRequest(
+			op.ctx,
+			op.logger,
+			op.response,
+			ParseEndpointRequest(question, h.endpointDomain),
 		)
 
-		question = request.Question[0]
-		response = request.Copy()
-	)
-
-	defer func() {
-		logger.Info("request complete", zap.Duration("duration", time.Since(start)))
-	}()
-
-	logger.Info("request start")
-	dnsutil.SetReply(response, request)
-	response.Rcode = dns.RcodeSuccess // default
-	defer h.writeResponse(logger, writer, response)
-
-	if question.Header().Class != dns.ClassINET {
-		logger.Error("unhandled class", zap.String("class", dnsutil.ClassToString(question.Header().Class)))
-		response.Rcode = dns.RcodeRefused
-		return
-	}
-
-	requestDomain := question.Header().Name
-	switch {
-	case dnsutil.IsBelow(h.endpointDomain, requestDomain):
-		h.serveEndpoint(response, h.parseEndpointRequest(question))
-
-	case dnsutil.IsBelow(h.groupDomain, requestDomain):
-		h.serveGroup(response, h.parseGroupRequest(question))
+	case dnsutil.IsBelow(h.groupDomain, question.Header().Name):
+		h.groupHandler.ServeRequest(
+			op.ctx,
+			op.logger,
+			op.response,
+			ParseGroupRequest(question, h.groupDomain),
+		)
 
 	default:
-		logger.Error("unrecognized domain", zap.String("domain", requestDomain))
-		response.Rcode = dns.RcodeNotZone
+		op.unhandled()
 	}
 }
