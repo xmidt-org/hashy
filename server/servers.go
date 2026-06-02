@@ -8,18 +8,14 @@ import (
 
 	"codeberg.org/miekg/dns"
 	"github.com/xmidt-org/hashy/config"
+	"github.com/xmidt-org/hashy/hashyzap"
 	"go.uber.org/zap"
 )
 
 // NewServerLogger produces a sublogger appropriate for server-specific messages.
 func NewServerLogger(parent *zap.Logger, serverName string, server *dns.Server) *zap.Logger {
 	return parent.With(
-		zap.Dict(
-			"server",
-			zap.String("name", serverName),
-			zap.String("addr", server.Addr),
-			zap.String("net", server.Net),
-		),
+		hashyzap.Server("server", serverName, server),
 	)
 }
 

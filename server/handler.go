@@ -17,6 +17,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 	"github.com/xmidt-org/hashy"
 	"github.com/xmidt-org/hashy/config"
+	"github.com/xmidt-org/hashy/hashyzap"
 	"github.com/xmidt-org/hashy/service"
 	"go.uber.org/zap"
 )
@@ -332,36 +333,25 @@ func (h *Handler) serveGroup(response *dns.Msg, request groupRequest) {
 }
 
 func (h *Handler) ServeDNS(ctx context.Context, writer dns.ResponseWriter, request *dns.Msg) {
-	start := time.Now()
-	logger := h.logger.With(
-		zap.Stringer("localAddress", writer.LocalAddr()),
-		zap.Uint16("id", request.ID),
-		// NOTE: the request isn't unpacked yet, so we can't see the questions
+	var (
+		start  = time.Now()
+		logger = h.logger.With(
+			hashyzap.Request("request", request),
+		)
+
+		question = request.Question[0]
+		response = request.Copy()
 	)
 
 	defer func() {
-		logger.Info("request finished", zap.Duration("duration", time.Since(start)))
+		logger.Info("request complete", zap.Duration("duration", time.Since(start)))
 	}()
 
-	logger.Info("received request")
-
-	if err := request.Unpack(); err != nil {
-		logger.Error("unable to unpack request", zap.Error(err))
-		return
-	}
-
-	response := request.Copy()
+	logger.Info("request start")
 	dnsutil.SetReply(response, request)
 	response.Rcode = dns.RcodeSuccess // default
 	defer h.writeResponse(logger, writer, response)
 
-	if len(request.Question) != 1 {
-		logger.Error("invalid number of questions", zap.Stringers("questions", request.Question))
-		response.Rcode = dns.RcodeRefused
-		return
-	}
-
-	question := request.Question[0]
 	if question.Header().Class != dns.ClassINET {
 		logger.Error("unhandled class", zap.String("class", dnsutil.ClassToString(question.Header().Class)))
 		response.Rcode = dns.RcodeRefused
