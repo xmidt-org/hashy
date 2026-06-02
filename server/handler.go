@@ -16,7 +16,6 @@ import (
 	"codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 	"github.com/xmidt-org/hashy"
-	"github.com/xmidt-org/hashy/config"
 	"github.com/xmidt-org/hashy/hashyzap"
 	"github.com/xmidt-org/hashy/service"
 	"go.uber.org/zap"
@@ -91,47 +90,9 @@ func WithLocator(l *service.Locator) HandlerOption {
 	})
 }
 
-func WithTTL(v uint32, jitter float64) HandlerOption {
+func WithJitterer(j *hashy.TTLJitterer) HandlerOption {
 	return handlerOptionFunc(func(h *Handler) (err error) {
-		if v == 0 {
-			v = hashy.DurationToSeconds(DefaultZoneTTL)
-		}
-
-		switch {
-		case jitter < 0.0 || jitter >= 1.0:
-			err = fmt.Errorf("invalid TTL jitter: %g", jitter)
-
-		case jitter == 0.0:
-			h.baseTTL = v
-			h.ttlRange = 0
-
-		default:
-			h.baseTTL = uint32((1.0 - jitter) * float64(v))
-			if h.baseTTL > 0 {
-				hi := uint32((1.0 + jitter) * float64(v))
-
-				// add 1 since Uint32N choose values in the half-open range [0,n)
-				// and we want to choose values in the range [0,h.ttlRange]
-				h.ttlRange = hi - h.baseTTL + 1
-			} else {
-				// v was too small for the jitter to register
-				h.baseTTL = v
-				h.ttlRange = 0
-			}
-		}
-
-		return
-	})
-}
-
-func WithZoneConfig(zcfg config.Zone) HandlerOption {
-	return handlerOptionFunc(func(h *Handler) (err error) {
-		err = WithZoneDomain(zcfg.Domain).applyToHandler(h)
-		if err == nil {
-			err = WithTTL(hashy.DurationToSeconds(zcfg.TTL), zcfg.TTLJitter).
-				applyToHandler(h)
-		}
-
+		h.jitterer = j
 		return
 	})
 }
@@ -154,12 +115,8 @@ type Handler struct {
 	// locator is the required service locator for this handler.
 	locator *service.Locator
 
-	// baseTTL is the low-end of the range for TTLs in this zone.
-	baseTTL uint32
-
-	// ttlRange the range of values added to baseTTL to generate the ttl's for each request.
-	// This can be 0, in which case baseTTL is used as is.
-	ttlRange uint32
+	// jitterer is used to provide jitter for the TTL of any DNS RRs produced by this handler.
+	jitterer *hashy.TTLJitterer
 }
 
 // NewHandler creates a Handler from a set of options.
@@ -183,9 +140,8 @@ func NewHandler(opts ...HandlerOption) (*Handler, error) {
 		WithZoneDomain(DefaultZoneDomain).applyToHandler(h)
 	}
 
-	if h.baseTTL == 0 {
-		h.baseTTL = hashy.DurationToSeconds(DefaultZoneTTL)
-		h.ttlRange = 0
+	if h.jitterer == nil {
+		h.jitterer, _ = hashy.NewTTLJitterer(hashy.DurationToSeconds(DefaultZoneTTL), 0.0)
 	}
 
 	return h, nil
@@ -204,17 +160,6 @@ func (h *Handler) Clone(logger *zap.Logger) *Handler {
 	}
 
 	return clone
-}
-
-// ttl choose a TTL value based on the jitter. If the jitter was zero, then this
-// method simply returns baseTTL. Otherwise, random value in the range [baseTTL, baseTTL+ttlRange]
-// is selected as the jitter.
-func (h *Handler) ttl() uint32 {
-	if h.ttlRange == 0 {
-		return h.baseTTL
-	}
-
-	return h.baseTTL + rand.Uint32N(h.ttlRange)
 }
 
 func (h *Handler) writeResponse(logger *zap.Logger, writer dns.ResponseWriter, response *dns.Msg) {
@@ -265,7 +210,7 @@ func (h *Handler) serveEndpoint(response *dns.Msg, request endpointRequest) {
 
 	header := dns.Header{
 		Name:  request.name,
-		TTL:   h.ttl(),
+		TTL:   h.jitterer.TTL(),
 		Class: dns.ClassINET,
 	}
 
@@ -321,7 +266,7 @@ func (h *Handler) serveGroup(response *dns.Msg, request groupRequest) {
 	if rrs != nil {
 		header := dns.Header{
 			Name:  request.name,
-			TTL:   h.ttl(),
+			TTL:   h.jitterer.TTL(),
 			Class: dns.ClassINET,
 		}
 

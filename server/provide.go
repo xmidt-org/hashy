@@ -4,6 +4,7 @@
 package server
 
 import (
+	"github.com/xmidt-org/hashy"
 	"github.com/xmidt-org/hashy/config"
 	"github.com/xmidt-org/hashy/service"
 	"go.uber.org/fx"
@@ -14,10 +15,25 @@ import (
 func Provide() fx.Option {
 	return fx.Options(
 		fx.Provide(
+			func(zcfg config.Zone, l *zap.Logger) (j *hashy.TTLJitterer, err error) {
+				j, err = hashy.NewTTLJitterer(
+					hashy.DurationToSeconds(zcfg.TTL),
+					zcfg.TTLJitter,
+				)
+
+				if err == nil {
+					lo, hi := j.Range()
+					l.Debug("TTL jitter range for generated DNS RRs",
+						zap.Uint32("lo", lo), zap.Uint32("hi", hi))
+				}
+
+				return
+			},
 			// create the base handler that will be cloned for each server
-			func(zcfg config.Zone, loc *service.Locator) (*Handler, error) {
+			func(zcfg config.Zone, j *hashy.TTLJitterer, loc *service.Locator) (*Handler, error) {
 				return NewHandler(
-					WithZoneConfig(zcfg),
+					WithZoneDomain(zcfg.Domain),
+					WithJitterer(j),
 					WithLocator(loc),
 				)
 			},

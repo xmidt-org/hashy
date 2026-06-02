@@ -27,7 +27,7 @@ type Zone struct {
 	// varied by this value. The default is 0, meaning no jitter.
 	//
 	// If this value is outside the range 0.0 <= TTLJitter < 1.0, an error is raised.
-	TTLJitter float64 `json:"ttlJitter" yaml:"ttlJitter" mapstructure:"ttlJitter"`
+	TTLJitter float32 `json:"ttlJitter" yaml:"ttlJitter" mapstructure:"ttlJitter"`
 }
 
 // UDP is the configuration for a single UDP server that serve DNS traffic.
