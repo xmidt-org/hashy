@@ -73,6 +73,40 @@ Message types are 7-bit values that indicate the purpose and layout of the messa
 
 A 32-bit length integer concludes the header and specifies how many message bytes follow.
 
+### Check message
+
+After the protocol [header](#header), a hash check request is formatted as follows:
+
+```mermaid
+---
+title: "Check Request"
+---
+packet
++8: "Group count (0 indicates no filtering by group)"
++8: "Group length"
++32: "Group (variable length)"
++8: "Subject length"
++32: "Subject (variable length)"
++32: "Object count"
++8: "Object length"
++32: "Object (variable length)"
+```
+
+```mermaid
+---
+title: "Check Response"
+---
+packet
++8: "Subject length"
++32: "Subject (variable length)"
++32: "Keep count (objects that hash to the subject)"
++8: "Group length"
++32: "Group (variable length)"
++32: "Reject count (objects that DO NOT hash to the subject)"
++8: "Group length"
++32: "Group (variable length)"
+```
+
 ## Install
 
 Add details here.
