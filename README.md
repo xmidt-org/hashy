@@ -28,7 +28,11 @@ By participating, you agree to this Code.
 
 ## Hash Protocol
 
-`hashy` provides a low-level protocol for hashing multiple objects at once and checking which objects hash to a subject. All integral values are big-endian.
+`hashy` provides a low-level protocol for hashing multiple objects at once and checking which objects hash to a subject. All integral values are big-endian. Binary strings are represented as a single length octet followed by the octets in the string.
+
+Hash requests concern *subjects* and *objects*. `hashy` assigns *objects* to *subjects* via distributed hashing. A *subject* is often a host name, while an *object* is often a MAC address or similar identifier. *Subjects* and *objects* are represented as binary strings.
+
+Hash requests may refer to *groups*. *Groups* are simply named sets of *subjects*. *Groups* are represented as binary strings.
 
 ### Header
 
@@ -83,13 +87,10 @@ title: "Check Request"
 ---
 packet
 +8: "Group count (0 indicates no filtering by group)"
-+8: "Group length"
-+32: "Group (variable length)"
-+8: "Subject length"
++32: "Groups"
 +32: "Subject (variable length)"
 +32: "Object count"
-+8: "Object length"
-+32: "Object (variable length)"
++32: "Objects (variable length)"
 ```
 
 ```mermaid
@@ -97,14 +98,11 @@ packet
 title: "Check Response"
 ---
 packet
-+8: "Subject length"
-+32: "Subject (variable length)"
++32: "Subject (variable length, same as request)"
 +32: "Keep count (objects that hash to the subject)"
-+8: "Group length"
-+32: "Group (variable length)"
++32: "Objects (variable length)"
 +32: "Reject count (objects that DO NOT hash to the subject)"
-+8: "Group length"
-+32: "Group (variable length)"
++32: "Objects (variable length)"
 ```
 
 ## Install
