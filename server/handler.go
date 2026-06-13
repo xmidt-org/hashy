@@ -87,12 +87,12 @@ func startOperation(ctx context.Context, base *zap.Logger, writer dns.ResponseWr
 
 	op.response = op.original.Copy()
 	op.response.Rcode = dns.RcodeSuccess // default
+	dnsutil.SetReply(op.response, op.original)
 
 	op.logger = base.With(
 		hashyzap.Request("request", op.original),
 	)
 
-	dnsutil.SetReply(op.response, op.original)
 	op.logger.Info("request start")
 	return
 }
