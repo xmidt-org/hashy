@@ -44,8 +44,9 @@ packet
 +16: "Magic number (0xA9F4)"
 +8: "Version"
 +16: "Message ID"
-+1: "RQ"
-+7: "Message Type"
++1: "RS"
++1: "ERR"
++6: "Message Type"
 +32: "Message length"
 ```
 
@@ -61,29 +62,61 @@ Version holds the 8-bit protocol version. The initial version is **1**.
 
 A client can set a 16-bit identifier to uniquely identify a message. `hashy` will place this same identifier into the response message.
 
-#### RQ bit
+#### RS bit
 
 A single bit indicates whether this is a request or response.  **0** is used for request, **1** for response.
 
+#### ERR bit
+
+This bit is set if the message represents an error.
+
 #### Message Type
 
-Message types are 7-bit values that indicate the purpose and layout of the message.
+Message types are 6-bit values that indicate the purpose and layout of the message.
 
 | Value | Message | Description |
 | --- | --- | --- |
-| 0000000 | Check | Request contains a subject and multiple objects. Response contains a list of objects that still hash to that subject and ones that do not. |
+| 000000 | Hash | Request contains one or more objects to hash. Response contains a map of objects to subjects. |
+| 000001 | Reverse Hash | Request contains a subject and multiple objects. Response contains a list of objects that still hash to that subject and ones that do not. |
 
 #### Message Length
 
 A 32-bit length integer concludes the header and specifies how many message bytes follow.
 
-### Check message
+### Error response
 
-After the protocol [header](#header), a hash check request is formatted as follows:
+For error responses, the [message length](#message-length) will be set to **4** and the message will consist of a 4-octet error code.
+
+### Hash
 
 ```mermaid
 ---
-title: "Check Request"
+title: "Hash Request"
+---
+packet
++16: "Subject (variable length)"
++8: "Group count (0 indicates no filtering by group)"
++16: "Groups"
++8: "Object count"
++16: "Objects"
+```
+
+```mermaid
+---
+title: "Hash Response"
+---
+packet
++16: "Subject (variable length)"
++8: "Count of object/group entries"
++16: "Object (variable length)"
++16: "Group (variable length)"
+```
+
+### Reverse Hash
+
+```mermaid
+---
+title: "Reverse Hash Request"
 ---
 packet
 +8: "Group count (0 indicates no filtering by group)"
@@ -95,7 +128,7 @@ packet
 
 ```mermaid
 ---
-title: "Check Response"
+title: "Reverse Hash Response"
 ---
 packet
 +32: "Subject (variable length, same as request)"
