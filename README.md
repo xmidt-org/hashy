@@ -77,15 +77,15 @@ Message types are 6-bit values that indicate the purpose and layout of the messa
 | Value | Message | Description |
 | --- | --- | --- |
 | 000000 | Hash | Request contains one or more objects to hash. Response contains a map of objects to subjects. |
-| 000001 | Reverse Hash | Request contains a subject and multiple objects. Response contains a list of objects that still hash to that subject and ones that do not. |
+| 000001 | Check | Request contains a subject and multiple objects. Response contains a list of objects that still hash to that subject and ones that do not. |
 
 #### Message Length
 
 A 32-bit length integer concludes the header and specifies how many message bytes follow.
 
-### Error response
+### Error responses
 
-For error responses, the [message length](#message-length) will be set to **4** and the message will consist of a 4-octet error code.
+For all error responses, the [message length](#message-length) will be set to **4** and the message will consist of a 4-octet error code.
 
 ### Hash
 
@@ -94,7 +94,6 @@ For error responses, the [message length](#message-length) will be set to **4** 
 title: "Hash Request"
 ---
 packet
-+16: "Subject (variable length)"
 +8: "Group count (0 indicates no filtering by group)"
 +16: "Groups"
 +8: "Object count"
@@ -106,36 +105,34 @@ packet
 title: "Hash Response"
 ---
 packet
-+16: "Subject (variable length)"
-+8: "Count of object/group entries"
++8: "Count of object/subject/group entries"
 +16: "Object (variable length)"
++16: "Subject (variable length)"
 +16: "Group (variable length)"
 ```
 
-### Reverse Hash
+### Check
 
 ```mermaid
 ---
-title: "Reverse Hash Request"
+title: "Check Request"
 ---
 packet
-+8: "Group count (0 indicates no filtering by group)"
-+32: "Groups"
-+32: "Subject (variable length)"
-+32: "Object count"
-+32: "Objects (variable length)"
++16: "Subject (variable length)"
++16: "Object count"
++16: "Objects (variable length)"
 ```
 
 ```mermaid
 ---
-title: "Reverse Hash Response"
+title: "Check Response"
 ---
 packet
-+32: "Subject (variable length, same as request)"
-+32: "Keep count (objects that hash to the subject)"
-+32: "Objects (variable length)"
-+32: "Reject count (objects that DO NOT hash to the subject)"
-+32: "Objects (variable length)"
++16: "Subject (variable length, same as request)"
++16: "Keep count (objects that hash to the subject)"
++16: "Objects (variable length)"
++16: "Reject count (objects that DO NOT hash to the subject)"
++16: "Objects (variable length)"
 ```
 
 ## Install
