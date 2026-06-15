@@ -76,8 +76,8 @@ Message types are 6-bit values that indicate the purpose and layout of the messa
 
 | Value | Message Type | Request | Response |
 | --- | --- | --- | --- |
-| 000000 | Hash | One or more objects to hash, optionally filtered by group(s) | A map of objects to subjects. |
-| 000001 | Check | A subject and multiple objects | A *keep* and a *reject* list of objects |
+| 000000 | [Hash](#hash) | One or more objects to hash, optionally filtered by group(s) | A map of objects to subjects. |
+| 000001 | [Check](#check) | A subject and multiple objects | A *keep* and a *reject* list of objects |
 
 #### Message Length
 
