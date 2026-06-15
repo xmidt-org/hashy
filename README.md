@@ -96,7 +96,7 @@ title: "Hash Request"
 packet
 +8: "Group count (0 indicates no filtering by group)"
 +16: "Groups"
-+8: "Object count"
++16: "Object count (must be at least 1)"
 +16: "Objects"
 ```
 
@@ -105,7 +105,7 @@ packet
 title: "Hash Response"
 ---
 packet
-+8: "Count of object/subject/group entries"
++16: "Count of object/subject/group entries"
 +16: "Object (variable length)"
 +16: "Subject (variable length)"
 +16: "Group (variable length)"
@@ -118,6 +118,7 @@ packet
 title: "Check Request"
 ---
 packet
++32: "Checksum"
 +16: "Subject (variable length)"
 +16: "Object count"
 +16: "Objects (variable length)"
@@ -128,10 +129,9 @@ packet
 title: "Check Response"
 ---
 packet
++32: "Checksum (possibly new)"
 +16: "Subject (variable length, same as request)"
-+16: "Keep count (objects that hash to the subject)"
-+16: "Objects (variable length)"
-+16: "Reject count (objects that DO NOT hash to the subject)"
++16: "Reject count (only present if the request checksum was out of date)"
 +16: "Objects (variable length)"
 ```
 
