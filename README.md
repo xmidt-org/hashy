@@ -17,7 +17,7 @@ Summary should be a small paragraph explanation of what this project does.
 ## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
-- [Details](#details)
+- [Hash Protocol](#hash-protocol)
 - [Install](#install)
 - [Contributing](#contributing)
 
@@ -26,9 +26,114 @@ Summary should be a small paragraph explanation of what this project does.
 This project and everyone participating in it are governed by the [XMiDT Code Of Conduct](https://xmidt.io/docs/community/code_of_conduct/). 
 By participating, you agree to this Code.
 
-## Details
+## Hash Protocol
 
-Add details here.
+`hashy` provides a low-level protocol for hashing multiple objects at once and checking which objects hash to a subject. All integral values are big-endian. Binary strings are represented as a single length octet followed by the octets in the string.
+
+Hash requests concern *subjects* and *objects*. `hashy` assigns *objects* to *subjects* via distributed hashing. A *subject* is often a host name, while an *object* is often a MAC address or similar identifier. *Subjects* and *objects* are represented as binary strings.
+
+Hash requests may refer to *groups*. *Groups* are simply named sets of *subjects*. *Groups* are represented as binary strings.
+
+### Header
+
+```mermaid
+---
+title: "Hash header"
+---
+packet
++16: "Magic number (0xA9F4)"
++8: "Version"
++16: "Message ID"
++1: "RS"
++1: "ERR"
++6: "Message Type"
++32: "Message length"
+```
+
+#### Magic Number
+
+All hash messages are prefixed with the 16-bit value **0xA9F4**.
+
+#### Version
+
+Version holds the 8-bit protocol version. The initial version is **1**.
+
+#### Message ID
+
+A client can set a 16-bit identifier to uniquely identify a message. `hashy` will place this same identifier into the response message.
+
+#### RS bit
+
+A single bit indicates whether this is a request or response.  **0** is used for request, **1** for response.
+
+#### ERR bit
+
+This bit is set if the message represents an error.
+
+#### Message Type
+
+Message types are 6-bit values that indicate the purpose and layout of the message.
+
+| Value | Message Type | Request | Response |
+| --- | --- | --- | --- |
+| 000000 | [Hash](#hash) | One or more objects to hash, optionally filtered by group(s) | A map of objects to subjects. |
+| 000001 | [Check](#check) | A subject and multiple objects | A *keep* and a *reject* list of objects |
+
+#### Message Length
+
+A 32-bit length integer concludes the header and specifies how many message bytes follow.
+
+### Error responses
+
+For all error responses, the [message length](#message-length) will be set to **4** and the message will consist of a 4-octet error code.
+
+### Hash
+
+```mermaid
+---
+title: "Hash Request"
+---
+packet
++8: "Group count (0 indicates no filtering by group)"
++16: "Groups"
++16: "Object count (must be at least 1)"
++16: "Objects"
+```
+
+```mermaid
+---
+title: "Hash Response"
+---
+packet
++16: "Count of object/subject/group entries"
++16: "Object (variable length)"
++16: "Subject (variable length)"
++16: "Group (variable length)"
+```
+
+### Check
+
+```mermaid
+---
+title: "Check Request"
+---
+packet
++32: "Checksum"
++16: "Subject (variable length)"
++16: "Object count"
++16: "Objects (variable length)"
+```
+
+```mermaid
+---
+title: "Check Response"
+---
+packet
++32: "Checksum (possibly new)"
++16: "Subject (variable length, same as request)"
++16: "Reject count (only present if the request checksum was out of date)"
++16: "Objects (variable length)"
+```
 
 ## Install
 
