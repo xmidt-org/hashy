@@ -1,7 +1,5 @@
 # hashy
 
-hashy is a distribute hashing-as-a-service server. It uses the results of hashing to direct traffic.
-
 [![Build Status](https://github.com/xmidt-org/hashy/workflows/CI/badge.svg)](https://github.com/xmidt-org/hashy/actions)
 [![codecov.io](http://codecov.io/github/xmidt-org/hashy/coverage.svg?branch=main)](http://codecov.io/github/xmidt-org/hashy?branch=main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/xmidt-org/hashy)](https://goreportcard.com/report/github.com/xmidt-org/hashy)
@@ -10,16 +8,30 @@ hashy is a distribute hashing-as-a-service server. It uses the results of hashin
 [![GitHub release](https://img.shields.io/github/release/xmidt-org/hashy.svg)](CHANGELOG.md)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/xmidt-org/hashy)](https://pkg.go.dev/github.com/xmidt-org/hashy)
 
-## Summary
-
-Summary should be a small paragraph explanation of what this project does.
-
 ## Table of Contents
 
+- [Summary](#summary)
 - [Code of Conduct](#code-of-conduct)
 - [Hash Protocol](#hash-protocol)
 - [Install](#install)
 - [Contributing](#contributing)
+
+## Summary
+
+`hashy` is a "hash as a service" microservice intended to locate services for CPE devices using a configurable distributed hash. `hashy` has the following goals:
+
+- Centralize the hashing logic (currently in XMiDT, hashing logic is implement by each server)
+- Use DNS to query for the servers for one particular CPE, e.g. `dig deadbeef.endpoint.hashy.net`
+- Allow services for updates on which CPEs should hash to them, i.e. a "reverse hash"
+- Allow discovery of the services to hash devices onto
+
+### Non-goals
+
+The following are **not goals** of `hashy`, though these may happen as side effects:
+
+- Replacing `consul`
+- Providing a generalized service discovery mechanism
+- Providing a source of truth for a footprint of services
 
 ## Code of Conduct
 
