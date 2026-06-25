@@ -4,7 +4,7 @@
 
 - Accepts DNS requests for devices
   - Host name is synthetic and contains the device name (e.g. MAC)
-- Provides a RESTful interface that allows checking for updates
+- Provides a custom binary interface for bulk checks
   - Hashy's [groups](#groups) can be updated dynamically
 - Static configuration of groups
   - A group is a list of host names (i.e. talaria servers)
@@ -16,7 +16,7 @@
 Hashy's DNS server understands hostnames with the following form:
 
 ```text
-{deviceName}[-{ignored text}].{subdomain}
+[{prefix}-]{deviceName}[-{ignored text}].endpoint.{subdomain}
 ```
 
 #### {deviceName}
@@ -29,13 +29,11 @@ Anything that comes after the `deviceName`, separated by a hyphen (`-`), is igno
 
 #### {subdomain}
 
-The `subdomain` is a domain that Hashy will respond to. Hashy can respond to any of a list of subdomains, set via configuration.
-
-Hashy will act as the SOA for configured subdomains. Any requests that don't match a configured subdomain results in an unknown response.
+The `subdomain` is a domain that Hashy will respond to. By default, `hashy.net` is the subdomain (zone) for all DNS requests sent to `hashy`.
 
 ### Groups
 
-Hashy organizes servers into `groups`. A *group* is simply *a list of servers with a unique name*. A group can be a datacenter, but it can also be any arbitrary list of servers. A server may belong to multiple groups. Groups are supplied to Hashy via configuration or (TODO) dynamically at runtime.
+Hashy organizes servers into `groups`. A *group* is simply *a list of servers with a unique name*. A group can be a datacenter, but it can also be any arbitrary list of servers. A server may belong to multiple groups (might need to change?). Groups are supplied to Hashy via configuration or (TODO) dynamically at runtime.
 
 Hashy computes a hash of each group so that clients can determine if a group's members have changed.
 
