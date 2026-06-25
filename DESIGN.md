@@ -19,6 +19,10 @@ Hashy's DNS server understands hostnames with the following form:
 [{prefix}-]{deviceName}[-{ignored text}].endpoint.{subdomain}
 ```
 
+#### {prefix}
+
+An optional `prefix` can be used before the `deviceName`. This allows device names to be used in host names where they would otherwise be illegal per [RFC 1035](https://www.rfc-editor.org/info/rfc1035/). For example, `112233445566.endpoint.hashy.net` is not a valid host name, since labels cannot start with a number. To hash the mac address `112233445566`, put any prefix you like in front of it, e.g. `mac-112233445566.endpoint.hashy.net`.
+
 #### {deviceName}
 
 The `deviceName` is the string that is hashed. It can only contain characters that are valid for a hostname. The meaning of the `deviceName` is opaque to Hashy. It can be a MAC address, UUID, or any arbitrary identifier. The list of servers returned via DNS is solely determined by the `deviceName`.
