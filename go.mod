@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	codeberg.org/miekg/dns v0.6.83
-	github.com/alecthomas/kong v1.15.0
+	github.com/alecthomas/kong v1.16.0
 	github.com/spf13/viper v1.21.0
 	github.com/xmidt-org/medley v0.1.0
 	github.com/xmidt-org/sallust v0.2.8
