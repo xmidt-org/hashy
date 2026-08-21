@@ -6,7 +6,7 @@ require (
 	codeberg.org/miekg/dns v0.6.90
 	github.com/alecthomas/kong v1.16.1
 	github.com/spf13/viper v1.21.0
-	github.com/xmidt-org/medley v0.1.0
+	github.com/xmidt-org/medley v0.1.1
 	github.com/xmidt-org/sallust v0.2.8
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.28.0
