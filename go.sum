@@ -1,5 +1,5 @@
-codeberg.org/miekg/dns v0.6.125 h1:zI59JnQnY9Hxzszy5glEa1lTolvcEDPuzJCA6+gSlIg=
-codeberg.org/miekg/dns v0.6.125/go.mod h1:CRdTEkDK9YPcVEH7sq/bwnnSz7syhHqbxfvY3IO0xlo=
+codeberg.org/miekg/dns v0.6.126 h1:0jJTvW9x5XeC7i7pjgC53cCEHN9/K3/IxAXqnRgRB0k=
+codeberg.org/miekg/dns v0.6.126/go.mod h1:CRdTEkDK9YPcVEH7sq/bwnnSz7syhHqbxfvY3IO0xlo=
 github.com/alecthomas/assert/v2 v2.11.0 h1:2Q9r3ki8+JYXvGsDyBXwH3LcJ+WK5D0gc5E8vS6K3D0=
 github.com/alecthomas/assert/v2 v2.11.0/go.mod h1:Bze95FyfUr7x34QZrjL+XP+0qgp/zg8yS+TtBj1WA3k=
 github.com/alecthomas/kong v1.17.0 h1:f52BVWChYMDkMkCoqkEWRuFOk/K4B5LO7xIijeLJRdk=
