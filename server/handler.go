@@ -11,8 +11,9 @@ import (
 
 	"codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
-	"github.com/xmidt-org/hashy/hashyzap"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/hashy/hashyzap"
 )
 
 const (

@@ -8,9 +8,10 @@ import (
 	"fmt"
 
 	"codeberg.org/miekg/dns"
-	"github.com/xmidt-org/hashy/config"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/hashy/config"
 )
 
 // Info holds the components for a single DNS server.
@@ -24,7 +25,11 @@ type Info struct {
 // If the server couldn't start, or the server stops, the supplied shutdowner is
 // used to shutdown the enclosing fx.App.
 func (i Info) Start(sh fx.Shutdowner) (err error) {
-	defer sh.Shutdown()
+	defer func() {
+		if shutdownErr := sh.Shutdown(); shutdownErr != nil {
+			i.Logger.Error("unable to shutdown the application", zap.Error(shutdownErr))
+		}
+	}()
 	i.Logger.Info("starting server")
 
 	if err = i.Server.ListenAndServe(); err == nil {
@@ -100,7 +105,7 @@ func (m Bundle) BindToLifecycle(lc fx.Lifecycle, sh fx.Shutdowner) {
 		lc.Append(
 			fx.StartStopHook(
 				func() {
-					go info.Start(sh)
+					go func() { _ = info.Start(sh) }() // Start logs any error
 				},
 				info.Stop,
 			),

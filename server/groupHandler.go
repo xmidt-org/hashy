@@ -12,9 +12,10 @@ import (
 
 	"codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/hashy"
 	"github.com/xmidt-org/hashy/service"
-	"go.uber.org/zap"
 )
 
 // GroupRequest holds the information from a DNS question for responding with group metadata.

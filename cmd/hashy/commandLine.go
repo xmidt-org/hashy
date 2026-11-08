@@ -11,13 +11,14 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/spf13/viper"
-	"github.com/xmidt-org/hashy/config"
-	"github.com/xmidt-org/hashy/server"
-	"github.com/xmidt-org/hashy/service"
 	"github.com/xmidt-org/sallust"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/hashy/config"
+	"github.com/xmidt-org/hashy/server"
+	"github.com/xmidt-org/hashy/service"
 )
 
 // CommandLine represents the hashy command line.
@@ -57,7 +58,7 @@ func (cl *CommandLine) newViper() (v *viper.Viper, err error) {
 
 // decorateGroups adds the command-line zone files, if any, to the ZoneFiles configuration
 // value. Additionally, all ZoneFiles are expanded.
-func (cl *CommandLine) decorateGroups(l *zap.Logger, gcfg config.Groups) config.Groups {
+func (cl *CommandLine) decorateGroups(_ *zap.Logger, gcfg config.Groups) config.Groups {
 	gcfg.ZoneFiles = slices.Grow(gcfg.ZoneFiles, len(cl.ZoneFiles))
 	gcfg.ZoneFiles = append(gcfg.ZoneFiles, cl.ZoneFiles...)
 
@@ -103,10 +104,10 @@ func (cl *CommandLine) provideLogging() fx.Option {
 					return &fxevent.ZapLogger{
 						Logger: l,
 					}
-				} else {
-					return &fxevent.ZapLogger{
-						Logger: zap.NewNop(),
-					}
+				}
+
+				return &fxevent.ZapLogger{
+					Logger: zap.NewNop(),
 				}
 			},
 		),

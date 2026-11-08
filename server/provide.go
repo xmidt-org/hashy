@@ -4,11 +4,12 @@
 package server
 
 import (
+	"go.uber.org/fx"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/hashy"
 	"github.com/xmidt-org/hashy/config"
 	"github.com/xmidt-org/hashy/service"
-	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 // Provide builds the server components.

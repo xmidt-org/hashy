@@ -3,19 +3,48 @@
 ---
 version: "2"
 linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
   enable:
+    - asasalint
+    - asciicheck
+    - bidichk
     - bodyclose
+    - canonicalheader
+    - copyloopvar
     - dupl
+    - dupword
+    - durationcheck
+    - errname
     - errorlint
+    - exptostd
+    - fatcontext
     - funlen
+    - gocheckcompilerdirectives
+    - gocritic
     - goconst
     - gosec
+    - intrange
+    - makezero
     - misspell
+    - mirror
+    - modernize
+    - nilerr
+    - nilnesserr
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - perfsprint
     - prealloc
+    - predeclared
+    - reassign
+    - recvcheck
+    - revive
+    - testifylint
+    - thelper
     - unconvert
-  disable:
-    - errcheck
-    - ineffassign
+    - usestdlibvars
+    - usetesting
+    - wastedassign
   settings:
     errorlint:
       errorf: false
@@ -24,6 +53,9 @@ linters:
     gosec:
       excludes:
         - G404 # weak random number generator, which constantly produces false positives
+    nolintlint:
+      require-explanation: true
+      require-specific: true
   exclusions:
     generated: lax
     presets:
@@ -32,15 +64,29 @@ linters:
       - legacy
       - std-error-handling
     rules:
+      # map types use a pointer receiver only to lazily allocate the map
+      - linters:
+          - recvcheck
+        text: '"(Bundle|groupCollector|servicesCollector|endpointCollector)"'
       - linters:
           - dupl
           - funlen
+          - goconst
         path: _test.go
     paths:
       - third_party$
       - builtin$
       - examples$
 formatters:
+  enable:
+    - gci
+    - gofmt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/xmidt-org/hashy)
   exclusions:
     generated: lax
     paths:

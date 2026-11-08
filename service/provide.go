@@ -6,9 +6,10 @@ package service
 import (
 	"context"
 
-	"github.com/xmidt-org/hashy/config"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/hashy/config"
 )
 
 // Provide creates the relevant components in this package.

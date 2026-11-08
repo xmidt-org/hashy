@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/rdata"
 )
 
 // Group is a single group of servers.
@@ -71,9 +70,7 @@ func (g *Group) RRs(rrType uint16) iter.Seq2[*Group, dns.RR] {
 				Hdr: dns.Header{
 					Class: dns.ClassINET,
 				},
-				TXT: rdata.TXT{
-					Txt: []string{buffer.String()},
-				},
+				Txt: []string{buffer.String()},
 			}
 
 			if !yield(g, rr) {
@@ -91,9 +88,7 @@ func (g *Group) RRs(rrType uint16) iter.Seq2[*Group, dns.RR] {
 				Hdr: dns.Header{
 					Class: dns.ClassINET,
 				},
-				TXT: rdata.TXT{
-					Txt: []string{buffer.String()},
-				},
+				Txt: []string{buffer.String()},
 			}
 
 			if !yield(g, rr) {

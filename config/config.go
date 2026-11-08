@@ -56,7 +56,7 @@ type TCP struct {
 
 type TCPServers map[string]TCP
 
-// DNS is the configuration all all servers that serve DNS traffic.
+// DNS is the configuration for all servers that serve DNS traffic.
 type DNS struct {
 	// Zone holds information about the synthetic zone that hashy serves.
 	Zone Zone `json:"zone" yaml:"zone" mapstructure:"zone"`

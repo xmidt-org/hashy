@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"codeberg.org/miekg/dns"
+
 	"github.com/xmidt-org/hashy"
 )
 

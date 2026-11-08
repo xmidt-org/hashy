@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/rdata"
 	"github.com/xmidt-org/medley"
 	"github.com/xmidt-org/medley/consistent"
 	"go.uber.org/zap"
@@ -49,9 +48,7 @@ func (le LocatedEndpoints) RRs(rrType uint16) iter.Seq2[*Endpoint, dns.RR] {
 						Hdr: dns.Header{
 							Class: dns.ClassINET,
 						},
-						A: rdata.A{
-							Addr: addr,
-						},
+						Addr: addr,
 					}
 
 					if !yield(endpoint, rr) {
@@ -69,9 +66,7 @@ func (le LocatedEndpoints) RRs(rrType uint16) iter.Seq2[*Endpoint, dns.RR] {
 						Hdr: dns.Header{
 							Class: dns.ClassINET,
 						},
-						AAAA: rdata.AAAA{
-							Addr: addr,
-						},
+						Addr: addr,
 					}
 
 					if !yield(endpoint, rr) {

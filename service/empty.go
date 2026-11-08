@@ -7,4 +7,4 @@ import "codeberg.org/miekg/dns"
 
 // emptyRRs is a 2-element sequence that is empty. The type C is the logical
 // container for each RR.
-func emptyRRs[C any](yield func(C, dns.RR) bool) {}
+func emptyRRs[C any](_ func(C, dns.RR) bool) {}

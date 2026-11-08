@@ -16,10 +16,11 @@ import (
 
 	"codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
-	"github.com/xmidt-org/hashy"
-	"github.com/xmidt-org/hashy/config"
 	"github.com/xmidt-org/medley"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/hashy"
+	"github.com/xmidt-org/hashy/config"
 )
 
 const (
@@ -156,7 +157,7 @@ func NewFileIngester(opts ...FileIngesterOption) (*FileIngester, error) {
 
 	if len(fi.discoveryDomain) == 0 {
 		// we know this won't cause an error
-		WithDiscoveryDomain(DefaultDiscoveryDomain).
+		_ = WithDiscoveryDomain(DefaultDiscoveryDomain).
 			applyToFileIngester(fi)
 	}
 
@@ -213,10 +214,8 @@ func (fi *FileIngester) ingestFile(l *zap.Logger, checksummer medley.Hash[uint32
 	}
 
 	defer closer.Close()
-	for rr, err := range parser.RRs() {
-		if rr == nil {
-			// a successful end is a nil RR and a nil error
-			// otherwise, err will hold any error that occurred
+	for rr, err := range parser.All() {
+		if err != nil {
 			return err
 		}
 
@@ -226,7 +225,8 @@ func (fi *FileIngester) ingestFile(l *zap.Logger, checksummer medley.Hash[uint32
 		}
 	}
 
-	return nil
+	// the iterator stops at the end of input or on the first parse error
+	return parser.Err()
 }
 
 func (fi *FileIngester) dispatchIngestEvent(event IngestEvent) {
@@ -267,7 +267,7 @@ func (fi *FileIngester) Ingest(ctx context.Context) {
 		event.Err = fi.ingestFile(ingestLogger, checksummer, &rrc, path)
 
 		if event.Err != nil {
-			fi.logger.Error("error parsing file", zap.String("path", path), zap.Error(err))
+			fi.logger.Error("error parsing file", zap.String("path", path), zap.Error(event.Err))
 			break
 		}
 	}

@@ -63,10 +63,10 @@ func NewTTLJitterer(value uint32, percent float32) (j *TTLJitterer, err error) {
 
 	default:
 		j.base = uint32((1.0 - percent) * float32(value))
-		max := uint32((1.0 + percent) * float32(value))
+		upper := uint32((1.0 + percent) * float32(value))
 
 		// rand.Uint32N chooses values in the half open range [0, n), and we want the full range
-		j.choose = (max - j.base) + 1
+		j.choose = (upper - j.base) + 1
 	}
 
 	return

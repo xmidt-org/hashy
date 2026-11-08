@@ -4,12 +4,13 @@
 package server
 
 import (
-	"fmt"
+	"errors"
 
 	"codeberg.org/miekg/dns"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/hashy/config"
 	"github.com/xmidt-org/hashy/hashyzap"
-	"go.uber.org/zap"
 )
 
 // NewServerLogger produces a sublogger appropriate for server-specific messages.
@@ -35,7 +36,7 @@ func NewUDPServer(cfg config.UDP) (s *dns.Server, err error) {
 		s.Net = "udp"
 
 	default:
-		return nil, fmt.Errorf("network for a udp server must be either blank or one of: [udp, udp4, udp6]")
+		return nil, errors.New("network for a udp server must be either blank or one of: [udp, udp4, udp6]")
 	}
 
 	if cfg.Size > 0 {
@@ -72,7 +73,7 @@ func NewTCPServer(cfg config.TCP) (s *dns.Server, err error) {
 		s.Net = "tcp"
 
 	default:
-		return nil, fmt.Errorf("network for a tcp server must be either blank or one of: [tcp, tcp4, tcp6]")
+		return nil, errors.New("network for a tcp server must be either blank or one of: [tcp, tcp4, tcp6]")
 	}
 
 	if cfg.MaxQueries > 0 {
